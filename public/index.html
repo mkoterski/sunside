@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>SunSide Berlin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+<style>
+:root,[data-theme="light"]{
+  --bg:#f4f2ee;--surface:#faf9f7;--surface2:#ffffff;--offset:#edeae4;
+  --border:oklch(0.3 0.01 80 / 0.11);--divider:oklch(0.3 0.01 80 / 0.07);
+  --text:#1c1a15;--muted:#6b6960;--faint:#b5b2a4;--inv:#faf9f7;
+  --accent:#e05500;--accent-h:#c04400;--accent-bg:#fff1e8;
+  --sun:#f5a623;--sun-bg:#fff8ec;--sun-border:oklch(from #f5a623 l c h / 0.25);
+  --left:#1a6fbf;--left-bg:#e8f0fb;--left-border:oklch(from #1a6fbf l c h / 0.3);
+  --right:#c0392b;--right-bg:#fdecea;--right-border:oklch(from #c0392b l c h / 0.3);
+  --sbahn:#068e2a;--ubahn:#005daa;--tram:#cc0000;--bus:#8b008b;--regional:#7a4e2d;
+  --ok:#2d7a3a;
+  --sh-sm:0 1px 3px oklch(0.2 0.01 80/0.07);
+  --sh-md:0 4px 16px oklch(0.2 0.01 80/0.09);
+  --sh-lg:0 12px 40px oklch(0.2 0.01 80/0.14);
+  --r-sm:0.375rem;--r-md:0.625rem;--r-lg:1rem;--r-xl:1.375rem;--r-full:9999px;
+  --ease:180ms cubic-bezier(0.16,1,0.3,1);
+  --font:'DM Sans',system-ui,sans-serif;
+  --xs:clamp(0.75rem,0.7rem + 0.2vw,0.875rem);
+  --sm:clamp(0.875rem,0.8rem + 0.3vw,1rem);
+  --base:clamp(1rem,0.95rem + 0.2vw,1.125rem);
+  --lg:clamp(1.1rem,1rem + 0.5vw,1.35rem);
+  --xl:clamp(1.3rem,1.1rem + 1vw,1.75rem);
+  --sp1:.25rem;--sp2:.5rem;--sp3:.75rem;--sp4:1rem;--sp5:1.25rem;
+  --sp6:1.5rem;--sp8:2rem;--sp10:2.5rem;--sp12:3rem;
+}
+[data-theme="dark"]{
+  --bg:#131109;--surface:#1b1916;--surface2:#22201c;--offset:#2a271f;
+  --border:oklch(0.9 0 0/0.08);--divider:oklch(0.9 0 0/0.05);
+  --text:#d5d1c5;--muted:#888478;--faint:#56534b;--inv:#1b1916;
+  --accent:#ff7c33;--accent-h:#ff9955;--accent-bg:#2c1808;
+  --sun:#ffc040;--sun-bg:#281c06;--sun-border:oklch(from #ffc040 l c h / 0.25);
+  --left:#5599e8;--left-bg:#0c1d35;--left-border:oklch(from #5599e8 l c h / 0.3);
+  --right:#e86060;--right-bg:#2d0e0e;--right-border:oklch(from #e86060 l c h / 0.3);
+  --sbahn:#2db84a;--ubahn:#4d96dd;--tram:#e84040;--bus:#c080e0;--regional:#c09060;
+  --sh-sm:0 1px 3px oklch(0 0 0/0.3);--sh-md:0 4px 16px oklch(0 0 0/0.4);--sh-lg:0 12px 40px oklch(0 0 0/0.5);
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme]){
+  --bg:#131109;--surface:#1b1916;--surface2:#22201c;--offset:#2a271f;
+  --border:oklch(0.9 0 0/0.08);--divider:oklch(0.9 0 0/0.05);
+  --text:#d5d1c5;--muted:#888478;--faint:#56534b;--inv:#1b1916;
+  --accent:#ff7c33;--accent-h:#ff9955;--accent-bg:#2c1808;
+  --sun:#ffc040;--sun-bg:#281c06;--left:#5599e8;--left-bg:#0c1d35;
+  --right:#e86060;--right-bg:#2d0e0e;
+  --sbahn:#2db84a;--ubahn:#4d96dd;--tram:#e84040;--bus:#c080e0;
+  --sh-sm:0 1px 3px oklch(0 0 0/0.3);--sh-md:0 4px 16px oklch(0 0 0/0.4);
+}}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-font-smoothing:antialiased;scroll-behavior:smooth}
+body{font-family:var(--font);font-size:var(--base);color:var(--text);background:var(--bg);
+  min-height:100dvh;max-width:480px;margin:0 auto;display:flex;flex-direction:column}
+img{display:block;max-width:100%}
+button{cursor:pointer;border:none;background:none;font:inherit;color:inherit}
+a,button{transition:color var(--ease),background var(--ease),opacity var(--ease),transform var(--ease),box-shadow var(--ease)}
+button:active{transform:scale(0.97)}
+p{text-wrap:pretty;max-width:72ch}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+
+/* ── App shell ── */
+#app{display:flex;flex-direction:column;flex:1}
+main{flex:1}
+
+/* ── Header ── */
+header{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:var(--sp4) var(--sp5);
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;box-shadow:var(--sh-sm);
+}
+.logo{display:flex;align-items:center;gap:var(--sp2);font-size:var(--lg);font-weight:800;letter-spacing:-.03em}
+.logo svg{color:var(--accent)}
+.logo em{color:var(--accent);font-style:normal}
+.hdr-right{display:flex;align-items:center;gap:var(--sp2)}
+.icon-btn{width:36px;height:36px;border-radius:var(--r-full);display:flex;align-items:center;justify-content:center;color:var(--muted);background:var(--offset)}
+.icon-btn:hover{color:var(--text)}
+
+/* ── Sun bar ── */
+#sun-bar{
+  background:var(--sun-bg);border-bottom:1px solid var(--sun-border);
+  padding:var(--sp2) var(--sp5);
+  display:flex;align-items:center;gap:var(--sp3);
+  font-size:var(--xs);color:var(--muted);font-variant-numeric:tabular-nums;
+  flex-wrap:wrap;
+}
+.sun-dot{width:8px;height:8px;border-radius:50%;background:var(--sun);box-shadow:0 0 6px var(--sun);flex-shrink:0}
+.sb-val{color:var(--text);font-weight:700}
+.sb-sep{width:1px;height:12px;background:var(--divider)}
+
+/* ── Screens ── */
+.screen{display:none}
+.screen.active{display:block}
+
+/* ── Section ── */
+.section{padding:var(--sp5)}
+.sec-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:var(--sp4);gap:var(--sp4)}
+.sec-title{font-size:var(--xs);font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.sec-sub{font-size:var(--xs);color:var(--faint);margin-top:2px}
+.refresh-btn{font-size:var(--xs);color:var(--accent);font-weight:700;padding:var(--sp1) var(--sp2);border-radius:var(--r-sm);flex-shrink:0}
+.refresh-btn:hover{background:var(--accent-bg)}
+
+/* ── State view ── */
+.state-view{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:var(--sp12) var(--sp8);gap:var(--sp4)}
+.sv-icon{width:64px;height:64px;border-radius:var(--r-full);background:var(--offset);
+  display:flex;align-items:center;justify-content:center;font-size:28px}
+.state-view h2{font-size:var(--lg);font-weight:800}
+.state-view p{font-size:var(--sm);color:var(--muted);max-width:30ch}
+
+/* ── Buttons ── */
+.btn{display:flex;align-items:center;gap:var(--sp2);border-radius:var(--r-full);
+  font-size:var(--sm);font-weight:700;padding:var(--sp3) var(--sp6)}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:var(--sh-sm)}
+.btn-primary:hover{background:var(--accent-h)}
+.btn-ghost{background:var(--offset);color:var(--text)}
+.btn-ghost:hover{background:var(--border)}
+
+/* ── Departure cards ── */
+.dep-list{display:flex;flex-direction:column;gap:var(--sp2)}
+.dep-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:var(--sp4);display:flex;align-items:center;gap:var(--sp4);cursor:pointer;
+  box-shadow:var(--sh-sm);
+  transition:box-shadow var(--ease),transform var(--ease),border-color var(--ease);
+}
+.dep-card:hover{box-shadow:var(--sh-md);transform:translateY(-1px);border-color:oklch(from var(--accent) l c h/.3)}
+.line-badge{flex-shrink:0;min-width:46px;height:46px;border-radius:var(--r-md);
+  display:flex;align-items:center;justify-content:center;
+  font-size:var(--xs);font-weight:900;letter-spacing:-.02em;color:#fff}
+.ls{background:var(--sbahn)}.lu{background:var(--ubahn)}.lt{background:var(--tram)}.lb{background:var(--bus)}.lr{background:var(--regional)}
+.dep-info{flex:1;min-width:0}
+.dep-dest{font-size:var(--sm);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dep-stop{font-size:var(--xs);color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── Live indicator ── */
+.live-badge{
+  display:inline-flex;align-items:center;gap:3px;
+  background:oklch(from var(--ok) l c h/.15);color:var(--ok);
+  border-radius:var(--r-full);padding:1px 6px;font-size:10px;font-weight:700;
+  margin-top:3px;
+}
+.live-dot{width:5px;height:5px;border-radius:50%;background:var(--ok);
+  animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+.dep-time-block{text-align:right;flex-shrink:0}
+.dep-mins{font-size:var(--lg);font-weight:900;font-variant-numeric:tabular-nums;color:var(--accent);line-height:1}
+.dep-mins.now-cls{color:var(--ok)}
+.dep-abs{font-size:var(--xs);color:var(--faint);font-variant-numeric:tabular-nums}
+.delay-tag{font-size:10px;color:#c0392b;font-weight:700}
+
+/* ── Skeleton ── */
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.skel{background:linear-gradient(90deg,var(--offset) 25%,var(--bg) 50%,var(--offset) 75%);
+  background-size:200% 100%;animation:shimmer 1.5s ease-in-out infinite;border-radius:var(--r-sm)}
+.skel-card{height:74px;border-radius:var(--r-lg);margin-bottom:var(--sp2)}
+
+/* ── Back btn ── */
+.back-btn{display:flex;align-items:center;gap:var(--sp2);font-size:var(--sm);font-weight:700;
+  color:var(--accent);padding:var(--sp3) 0;margin-bottom:var(--sp2)}
+.back-btn:hover{color:var(--accent-h)}
+
+/* ── Journey summary card ── */
+.journey-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);
+  padding:var(--sp5);margin-bottom:var(--sp4);box-shadow:var(--sh-sm);
+}
+.jc-top{display:flex;align-items:flex-start;gap:var(--sp3);margin-bottom:var(--sp3)}
+.jc-badge{min-width:52px;height:52px;border-radius:var(--r-lg);display:flex;align-items:center;justify-content:center;font-size:var(--sm);font-weight:900;color:#fff;flex-shrink:0}
+.jc-meta h3{font-size:var(--base);font-weight:800}
+.jc-meta p{font-size:var(--xs);color:var(--muted);margin-top:3px}
+
+/* ── Vehicle position strip ── */
+.veh-strip{
+  background:var(--sun-bg);border:1px solid var(--sun-border);
+  border-radius:var(--r-md);padding:var(--sp3) var(--sp4);
+  display:flex;align-items:center;gap:var(--sp3);
+  font-size:var(--xs);color:var(--muted);
+}
+.veh-icon{font-size:18px;flex-shrink:0}
+.veh-text strong{color:var(--text);font-weight:700}
+.veh-ago{color:var(--faint);font-size:10px;margin-top:2px}
+
+/* ── Stops list ── */
+.stops-label{font-size:var(--xs);font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:var(--sp3)}
+.stops-list{display:flex;flex-direction:column;gap:var(--sp1);max-height:340px;overflow-y:auto}
+.stop-item{display:flex;align-items:center;gap:var(--sp3);padding:var(--sp3);
+  border-radius:var(--r-md);cursor:pointer;border:1px solid transparent;
+  transition:background var(--ease),border-color var(--ease)}
+.stop-item:hover{background:var(--offset);border-color:var(--border)}
+.stop-item.disabled{opacity:.4;pointer-events:none}
+.sdot{width:10px;height:10px;flex-shrink:0;border-radius:50%;border:2px solid var(--muted);background:var(--bg)}
+.sdot.origin{background:var(--accent);border-color:var(--accent)}
+.stop-name{font-size:var(--sm);flex:1}
+.stop-time{font-size:var(--xs);color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* ── Result ── */
+.result-card{
+  border-radius:var(--r-xl);padding:var(--sp6);margin-bottom:var(--sp4);
+  text-align:center;display:flex;flex-direction:column;align-items:center;gap:var(--sp4);
+  box-shadow:var(--sh-lg);
+}
+.rc-left{background:var(--left-bg);border:2px solid var(--left-border)}
+.rc-right{background:var(--right-bg);border:2px solid var(--right-border)}
+.rc-neutral{background:var(--sun-bg);border:2px solid var(--sun-border)}
+
+/* Seat diagram */
+.diagram-wrap{position:relative;width:200px;height:90px;margin:var(--sp2) 0}
+.train-box{
+  position:absolute;inset:0;border-radius:var(--r-lg);
+  border:2px solid var(--border);background:var(--surface2);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 var(--sp4);
+}
+.seat{width:30px;height:42px;border-radius:var(--r-sm);border:2px solid var(--border)}
+.seat.sun{background:oklch(from var(--sun) l c h/.4);border-color:var(--sun)}
+.seat.shade{background:oklch(from var(--left) l c h/.25);border-color:var(--left)}
+.sun-from{position:absolute;top:-26px;font-size:var(--xs);font-weight:700;color:var(--sun);display:flex;align-items:center;gap:2px}
+.sun-from.from-left{left:12px}
+.sun-from.from-right{right:12px}
+.dir-label{position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);
+  font-size:var(--xs);color:var(--faint);white-space:nowrap}
+.result-headline{font-size:var(--xl);font-weight:900;letter-spacing:-.03em;line-height:1.05}
+.hl-left{color:var(--left)}.hl-right{color:var(--right)}.hl-neutral{color:var(--sun)}
+.result-sub{font-size:var(--sm);color:var(--muted);max-width:32ch;line-height:1.55}
+
+/* ── Data grid ── */
+.data-grid{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:var(--sp4)}
+.data-row{display:flex;align-items:center;justify-content:space-between;padding:var(--sp3) var(--sp4);border-bottom:1px solid var(--divider);font-size:var(--sm)}
+.data-row:last-child{border-bottom:none}
+.dr-label{color:var(--muted)}
+.dr-val{font-weight:700;font-variant-numeric:tabular-nums;text-align:right;max-width:60%}
+
+/* ── Warning ── */
+.warn{background:var(--sun-bg);border:1px solid var(--sun-border);border-radius:var(--r-md);
+  padding:var(--sp3) var(--sp4);font-size:var(--xs);color:var(--muted);
+  display:flex;align-items:flex-start;gap:var(--sp2);margin-bottom:var(--sp4)}
+.warn-icon{flex-shrink:0;margin-top:1px}
+
+/* ── Animations ── */
+@keyframes fade-up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.anim{animation:fade-up 260ms cubic-bezier(0.16,1,0.3,1) both}
+
+/* scrollbar thin */
+.stops-list{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+      <circle cx="13" cy="13" r="5.5" fill="currentColor"/>
+      <line x1="13" y1="1" x2="13" y2="4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="13" y1="21.5" x2="13" y2="25" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="1" y1="13" x2="4.5" y2="13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="21.5" y1="13" x2="25" y2="13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="4.4" y1="4.4" x2="6.9" y2="6.9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="19.1" y1="19.1" x2="21.6" y2="21.6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="21.6" y1="4.4" x2="19.1" y2="6.9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="6.9" y1="19.1" x2="4.4" y2="21.6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+    </svg>
+    Sun<em>Side</em>
+  </div>
+  <div class="hdr-right">
+    <button class="icon-btn" id="theme-toggle" aria-label="Toggle theme">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- Sun bar -->
+<div id="sun-bar">
+  <div class="sun-dot"></div>
+  <span><span class="sb-val" id="sb-az">-</span> az</span>
+  <div class="sb-sep"></div>
+  <span><span class="sb-val" id="sb-el">-</span> elev</span>
+  <div class="sb-sep"></div>
+  <span><span class="sb-val" id="sb-dir">-</span></span>
+  <div class="sb-sep"></div>
+  <span id="sb-time">-</span>
+</div>
+
+<main>
+
+<!-- SCREEN: permission -->
+<div class="screen active" id="scr-perm">
+  <div class="state-view anim">
+    <div class="sv-icon">📍</div>
+    <h2>Where are you?</h2>
+    <p>SunSide finds departures nearby and tells you which seat stays in the shade.</p>
+    <button class="btn btn-primary" onclick="requestLocation()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      Use my location
+    </button>
+    <button class="btn btn-ghost" onclick="useDemo()">Demo - Hugenottenplatz, Berlin</button>
+  </div>
+</div>
+
+<!-- SCREEN: loading -->
+<div class="screen" id="scr-load">
+  <div class="section">
+    <div class="sec-hdr"><span class="sec-title">Finding departures…</span></div>
+    <div class="skel-card skel"></div>
+    <div class="skel-card skel"></div>
+    <div class="skel-card skel"></div>
+    <div class="skel-card skel"></div>
+  </div>
+</div>
+
+<!-- SCREEN: departures -->
+<div class="screen" id="scr-deps">
+  <div class="section">
+    <div class="sec-hdr">
+      <div>
+        <div class="sec-title">Nearby departures</div>
+        <div class="sec-sub" id="loc-label">-</div>
+      </div>
+      <button class="refresh-btn" onclick="doRefresh()">↻ Refresh</button>
+    </div>
+    <div class="dep-list" id="dep-list"></div>
+  </div>
+</div>
+
+<!-- SCREEN: stop picker -->
+<div class="screen" id="scr-stops">
+  <div class="section">
+    <button class="back-btn" onclick="show('scr-deps')">← Back</button>
+    <div class="journey-card anim" id="jc-card"></div>
+    <div id="veh-strip-wrap"></div>
+    <div class="stops-label">Where do you get off?</div>
+    <div class="stops-list" id="stops-list"></div>
+  </div>
+</div>
+
+<!-- SCREEN: result -->
+<div class="screen" id="scr-result">
+  <div class="section">
+    <button class="back-btn" onclick="show('scr-stops')">← Choose different stop</button>
+    <div id="result-wrap" class="anim"></div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
+<script>
+// ── Theme ──────────────────────────────────────────────
+(function(){
+  const btn=document.getElementById('theme-toggle');
+  const html=document.documentElement;
+  let d=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
+  html.setAttribute('data-theme',d);
+  setIcon(d);
+  btn.addEventListener('click',()=>{d=d==='dark'?'light':'dark';html.setAttribute('data-theme',d);setIcon(d)});
+  function setIcon(t){btn.innerHTML=t==='dark'
+    ?'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>'
+    :'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>'}
+})();
+
+// ── State ──────────────────────────────────────────────
+// API base is configurable. By default it points at the local proxy path "/api",
+// which the Cloudflare Worker serves (cache + single-flight in front of VBB).
+// To bypass the proxy during local dev, set window.SUNSIDE_API before this script,
+// e.g. <script>window.SUNSIDE_API='https://v6.vbb.transport.rest'</script>
+const API=(typeof window!=='undefined'&&window.SUNSIDE_API)||'/api';
+let uLat=null,uLon=null;
+let allDeps=[];
+let selDep=null;
+let selTrip=null;
+let radarVehicle=null; // live vehicle position from /radar
+
+// ── Sun ───────────────────────────────────────────────
+function sunInfo(lat,lon,when){
+  const pos=SunCalc.getPosition(when||new Date(),lat,lon);
+  const az=((pos.azimuth*180/Math.PI)+180+360)%360;
+  const el=pos.altitude*180/Math.PI;
+  return {az,el};
+}
+function cardinalFromAz(az){
+  return ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round(az/22.5)%16];
+}
+function updateSunBar(lat,lon){
+  const {az,el}=sunInfo(lat,lon);
+  document.getElementById('sb-az').textContent=az.toFixed(1)+'°';
+  document.getElementById('sb-el').textContent=el.toFixed(1)+'°';
+  document.getElementById('sb-dir').textContent=cardinalFromAz(az);
+  document.getElementById('sb-time').textContent=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+}
+setInterval(()=>{if(uLat)updateSunBar(uLat,uLon)},60000);
+
+// ── Location ──────────────────────────────────────────
+function requestLocation(){
+  show('scr-load');
+  navigator.geolocation.getCurrentPosition(
+    p=>{uLat=p.coords.latitude;uLon=p.coords.longitude;updateSunBar(uLat,uLon);loadDeps()},
+    ()=>{alert('Location denied - using demo.');useDemo()},
+    {timeout:10000,enableHighAccuracy:true}
+  );
+}
+function useDemo(){
+  // Hugenottenplatz area (Wedding/Mitte, Bus 50 territory)
+  uLat=52.5435;uLon=13.3470;
+  updateSunBar(uLat,uLon);
+  show('scr-load');
+  loadDeps();
+}
+
+// ── Load nearby departures ─────────────────────────────
+async function loadDeps(){
+  try{
+    // Round coords to 3 decimals (~110m grid) so nearby users hit identical
+    // cache keys at the proxy. This multiplies cache hit rate during clustering.
+    const qLat=uLat.toFixed(3), qLon=uLon.toFixed(3);
+    const nr=await fetch(`${API}/locations/nearby?latitude=${qLat}&longitude=${qLon}&distance=700&results=10`).then(r=>r.json());
+    if(!nr.length){showErr('No stops found nearby.');return}
+    document.getElementById('loc-label').textContent=`${nr.length} stops within 700 m`;
+
+    // Fan out to 4 stops (was 6). At 4 deps/stop that is still plenty of choice
+    // while cutting upstream load by a third per session.
+    const proms=nr.slice(0,4).map(s=>
+      fetch(`${API}/stops/${s.id}/departures?duration=35&results=8&bus=true&suburban=true&subway=true&tram=true&ferry=false&express=false&regional=false`)
+        .then(r=>r.json())
+        .then(d=>(d.departures||[]).map(x=>({...x,_sId:s.id,_sName:s.name})))
+        .catch(()=>[])
+    );
+    let deps=(await Promise.all(proms)).flat();
+    deps.sort((a,b)=>new Date(a.when||a.plannedWhen)-new Date(b.when||b.plannedWhen));
+
+    // Deduplicate by line+direction+stop
+    const seen=new Set();
+    deps=deps.filter(d=>{
+      const k=`${d.line?.name}|${d.direction}|${d._sId}`;
+      if(seen.has(k))return false;seen.add(k);return true;
+    });
+
+    allDeps=deps.slice(0,14);
+    renderDeps(allDeps);
+    show('scr-deps');
+  }catch(e){console.error(e);showErr('Failed to load. Check connection.')}
+}
+
+function badgeClass(p){
+  return p==='suburban'?'ls':p==='subway'?'lu':p==='tram'?'lt':p==='bus'?'lb':'lr';
+}
+
+function renderDeps(deps){
+  const el=document.getElementById('dep-list');
+  if(!deps.length){el.innerHTML='<div class="state-view"><div class="sv-icon">🚉</div><h2>No departures</h2><p>Nothing departing nearby in the next 35 min.</p></div>';return}
+  el.innerHTML=deps.map((d,i)=>{
+    const prod=d.line?.product;
+    const name=d.line?.name||'?';
+    const dest=d.direction||'?';
+    const when=new Date(d.when||d.plannedWhen);
+    const mins=Math.round((when-Date.now())/60000);
+    const minsStr=mins<=0?'now':`${mins}′`;
+    const timeStr=when.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    const delay=d.delay?Math.round(d.delay/60):0;
+    const delayTag=delay>0?`<div class="delay-tag">+${delay} min</div>`:'';
+    const liveTag=d.when&&d.delay!==null?'<span class="live-badge"><span class="live-dot"></span>LIVE</span>':'';
+    return `
+    <div class="dep-card anim" style="animation-delay:${i*35}ms" onclick="selectDep(${i})">
+      <div class="line-badge ${badgeClass(prod)}">${name}</div>
+      <div class="dep-info">
+        <div class="dep-dest">${dest}</div>
+        <div class="dep-stop">from ${d._sName}</div>
+        ${liveTag}${delayTag}
+      </div>
+      <div class="dep-time-block">
+        <div class="dep-mins ${mins<=1?'now-cls':''}">${minsStr}</div>
+        <div class="dep-abs">${timeStr}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Select departure → fetch trip + radar ──────────────
+async function selectDep(idx){
+  selDep=allDeps[idx];
+  radarVehicle=null;
+  show('scr-load');
+
+  const prod=selDep.line?.product;
+  const name=selDep.line?.name||'?';
+  const prodLabel=prod==='suburban'?'S-Bahn':prod==='subway'?'U-Bahn':prod==='tram'?'Tram':prod==='bus'?'Bus':'Train';
+  const when=new Date(selDep.when||selDep.plannedWhen);
+  const timeStr=when.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+
+  // Journey card
+  document.getElementById('jc-card').innerHTML=`
+    <div class="jc-top">
+      <div class="jc-badge ${badgeClass(prod)}">${name}</div>
+      <div class="jc-meta">
+        <h3>${selDep.direction||'?'}</h3>
+        <p>${prodLabel} · departs ${timeStr} from ${selDep._sName}</p>
+      </div>
+    </div>`;
+
+  // Fetch trip + radar in parallel
+  const [tripData, veh] = await Promise.all([
+    fetchTrip(selDep.tripId),
+    fetchVehiclePosition(selDep)
+  ]);
+
+  selTrip=tripData;
+  radarVehicle=veh;
+  renderVehicleStrip(veh);
+  renderStops(tripData);
+  show('scr-stops');
+}
+
+async function fetchTrip(tripId){
+  if(!tripId)return null;
+  try{
+    const r=await fetch(`${API}/trips/${encodeURIComponent(tripId)}?stopovers=true&polyline=false`);
+    return await r.json();
+  }catch{return null}
+}
+
+// ── Radar: find the actual vehicle on the map ──────────
+async function fetchVehiclePosition(dep){
+  // Build bounding box 1.5km around user
+  const D=0.014; // ~1km in degrees
+  const bbox=`north=${uLat+D}&south=${uLat-D}&west=${uLon-D}&east=${uLon+D}`;
+  try{
+    const r=await fetch(`${API}/radar?${bbox}&results=64&duration=20&frames=1&polylines=false`);
+    const data=await r.json();
+    const vehicles=data.movements||[];
+
+    // Match by tripId first, fallback to line name + direction
+    let match=vehicles.find(v=>v.tripId===dep.tripId);
+    if(!match){
+      match=vehicles.find(v=>
+        v.line?.name===dep.line?.name && v.direction===dep.direction
+      );
+    }
+    return match||null;
+  }catch{return null}
+}
+
+function renderVehicleStrip(veh){
+  const wrap=document.getElementById('veh-strip-wrap');
+  if(!veh||!veh.location){wrap.innerHTML='';return}
+
+  const dist=haversine(uLat,uLon,veh.location.latitude,veh.location.longitude);
+  const distStr=dist<1?(dist*1000).toFixed(0)+' m':(dist).toFixed(1)+' km';
+  const prodIcon=selDep.line?.product==='bus'?'🚌':selDep.line?.product==='tram'?'🚋':selDep.line?.product==='suburban'?'🚆':'🚇';
+
+  wrap.innerHTML=`
+    <div class="veh-strip" style="margin-bottom:var(--sp4)">
+      <div class="veh-icon">${prodIcon}</div>
+      <div class="veh-text">
+        <div><strong>Vehicle located</strong> - ${distStr} away</div>
+        <div class="veh-ago">Live GPS position via VBB radar</div>
+      </div>
+      <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    </div>`;
+}
+
+// ── Render stops ───────────────────────────────────────
+function renderStops(trip){
+  const list=document.getElementById('stops-list');
+  let stops=[];
+  if(trip?.stopovers){
+    stops=trip.stopovers.map(s=>({
+      id:s.stop?.id,
+      name:s.stop?.name,
+      arrival:s.arrival||s.plannedArrival,
+      lat:s.stop?.location?.latitude,
+      lon:s.stop?.location?.longitude,
+    }));
+    const fi=stops.findIndex(s=>s.id===selDep._sId);
+    if(fi>=0)stops=stops.slice(fi);
+  }
+  if(!stops.length)stops=[{id:'dest',name:selDep.direction||'Final stop',arrival:null}];
+
+  list.innerHTML=stops.map((s,i)=>{
+    const t=s.arrival?new Date(s.arrival).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'';
+    const disabled=i===0?'disabled':'';
+    return `
+    <div class="stop-item ${disabled}" onclick="calcSun(${i},${JSON.stringify(stops).replace(/"/g,'&quot;')})">
+      <div class="sdot ${i===0?'origin':''}"></div>
+      <div class="stop-name">${s.name}${i===0?' <span style="color:var(--accent);font-size:var(--xs)">(boarding here)</span>':''}</div>
+      ${t?`<div class="stop-time">${t}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ── Core: bearing + sun side ───────────────────────────
+function bearing(lat1,lon1,lat2,lon2){
+  const r=Math.PI/180;
+  const dL=(lon2-lon1)*r;
+  const y=Math.sin(dL)*Math.cos(lat2*r);
+  const x=Math.cos(lat1*r)*Math.sin(lat2*r)-Math.sin(lat1*r)*Math.cos(lat2*r)*Math.cos(dL);
+  return (Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+
+function haversine(la1,lo1,la2,lo2){
+  const R=6371,r=Math.PI/180;
+  const dLa=(la2-la1)*r,dLo=(lo2-lo1)*r;
+  const a=Math.sin(dLa/2)**2+Math.cos(la1*r)*Math.cos(la2*r)*Math.sin(dLo/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// Classify the sun side for one bearing. Returns 'left' | 'right' | 'neutral'.
+// rel = (sunAz - bearing + 360) % 360 ; ~90°=right, ~270°=left.
+function sideForBearing(sunAz,bearing){
+  const rel=(sunAz-bearing+360)%360;
+  if(rel>=25&&rel<155)return 'right';   // sun on right → shade is LEFT
+  if(rel>=205&&rel<335)return 'left';    // sun on left  → shade is RIGHT
+  return 'neutral';                       // front / behind
+}
+
+// Build the list of bearings the rider actually experiences, boarding → exit.
+// Each leg carries its length (km) so we can weight by distance travelled.
+function buildLegs(stops, stopIdx){
+  const legs=[];
+  for(let i=0;i<stopIdx;i++){
+    const a=stops[i], b=stops[i+1];
+    if(a?.lat!=null&&a?.lon!=null&&b?.lat!=null&&b?.lon!=null){
+      legs.push({
+        from:a.name, to:b.name,
+        bearing:bearing(a.lat,a.lon,b.lat,b.lon),
+        km:haversine(a.lat,a.lon,b.lat,b.lon)
+      });
+    }
+  }
+  return legs;
+}
+
+function calcSun(stopIdx, stops){
+  const dest=stops[stopIdx];
+  const depTime=new Date(selDep.when||selDep.plannedWhen);
+
+  // Sun position at departure time at boarding location. Over a typical Berlin
+  // ride (minutes) the sun moves <1°, so a single sample is fine; the vehicle
+  // bearing is what actually varies, so that is what we resolve per segment.
+  const {az:sunAz,el:sunEl}=sunInfo(uLat,uLon,depTime);
+
+  // Segment-aware analysis: walk every leg between boarding and exit.
+  const legs=buildLegs(stops,stopIdx);
+
+  let trainBearing=null;        // representative bearing for the display/diagram
+  let bearingSource='estimated';
+  let flipNote='';              // set when the shaded side changes mid-trip
+
+  if(legs.length){
+    // Weight each leg's side by its length, pick the dominant non-neutral side.
+    const weight={left:0,right:0,neutral:0};
+    const sides=legs.map(l=>{
+      const s=sideForBearing(sunAz,l.bearing);
+      weight[s]+=l.km;
+      return s;
+    });
+    // Representative bearing = the longest leg (most of the ride spent on it).
+    const longest=legs.reduce((a,b)=>b.km>a.km?b:a,legs[0]);
+    trainBearing=longest.bearing;
+    bearingSource=legs.length>1?`${legs.length} stop segments`:'stop coordinates';
+
+    // Detect a flip: the recommended (shade) side changing between legs.
+    const shadeOf=s=>s==='left'?'right':s==='right'?'left':null;
+    let firstReco=null, flipAt=null;
+    for(let i=0;i<sides.length;i++){
+      const reco=shadeOf(sides[i]);
+      if(reco){
+        if(firstReco===null){firstReco=reco;}
+        else if(reco!==firstReco&&flipAt===null){flipAt=legs[i].from;break;}
+      }
+    }
+    if(flipAt){
+      flipNote=`The shaded side changes around ${flipAt}. Recommendation below is for the longest part of your ride.`;
+    }
+  }
+
+  // Prefer live radar bearing only when there is essentially one straight leg,
+  // since a single GPS heading can't represent a curved multi-segment ride.
+  if(radarVehicle?.bearing!=null && legs.length<=1){
+    trainBearing=radarVehicle.bearing;
+    bearingSource='live vehicle GPS';
+  }
+
+  // Fallbacks when no usable stop geometry exists at all.
+  if(trainBearing===null && dest.lat!=null && dest.lon!=null){
+    trainBearing=bearing(uLat,uLon,dest.lat,dest.lon);
+    bearingSource='user → destination';
+  }
+  if(trainBearing===null){
+    trainBearing=45;bearingSource='fallback estimate';
+  }
+
+  renderResult(trainBearing,sunAz,sunEl,dest,stops[0],bearingSource,flipNote);
+  show('scr-result');
+}
+
+function renderResult(trainBearing,sunAz,sunEl,dest,origin,src,flipNote){
+  // Relative angle: 0°=straight ahead, 90°=right, 180°=behind, 270°=left
+  const rel=(sunAz-trainBearing+360)%360;
+
+  let side,hl,hlClass,cardClass,diag,explain;
+  const lineName=selDep.line?.name||'?';
+  const elLow=sunEl<8;
+
+  if(sunEl<-3){
+    side='none';hl='No direct sun 🌙';hlClass='hl-neutral';cardClass='rc-neutral';
+    explain='The sun is below the horizon. Both sides are equally comfortable.';
+    diag=buildDiag('none');
+  } else if(elLow){
+    const sideGuess=rel<180?'right':'left';
+    side='low';hl='Sun very low ⚠️';hlClass='hl-neutral';cardClass='rc-neutral';
+    explain=`At only ${sunEl.toFixed(0)}° elevation the sun can penetrate deeply. The ${sideGuess} side has more exposure - but shade side still wins.`;
+    diag=buildDiag(sideGuess);
+  } else if(rel<25||rel>335){
+    side='front';hl='Sun straight ahead';hlClass='hl-neutral';cardClass='rc-neutral';
+    explain='The sun is directly in the direction of travel. Central seats or the aisle minimise exposure.';
+    diag=buildDiag('front');
+  } else if(rel>=25&&rel<155){
+    side='right';hl='Sit on the LEFT ←';hlClass='hl-left';cardClass='rc-left';
+    explain=`Sun is ${sunAz.toFixed(0)}° (${cardinalFromAz(sunAz)}) at ${sunEl.toFixed(0)}° - hitting the right side. Left side stays in shade.`;
+    diag=buildDiag('right');
+  } else if(rel>=155&&rel<205){
+    side='back';hl='Any seat - sun behind';hlClass='hl-neutral';cardClass='rc-neutral';
+    explain='The sun is behind the train. Both sides receive minimal direct sunlight.';
+    diag=buildDiag('back');
+  } else {
+    side='left';hl='Sit on the RIGHT →';hlClass='hl-right';cardClass='rc-right';
+    explain=`Sun is ${sunAz.toFixed(0)}° (${cardinalFromAz(sunAz)}) at ${sunEl.toFixed(0)}° - hitting the left side. Right side stays in shade.`;
+    diag=buildDiag('left');
+  }
+
+  const warn=elLow?`<div class="warn"><span class="warn-icon">⚠️</span><span>Low sun angle (${sunEl.toFixed(0)}°) can reach past seat backs. Shade side still recommended.</span></div>`:'';
+  const flip=flipNote?`<div class="warn"><span class="warn-icon">↪️</span><span>${flipNote}</span></div>`:'';
+  const radar=radarVehicle?`<div class="warn" style="background:var(--left-bg);border-color:var(--left-border)"><span class="warn-icon">📡</span><span>Train bearing from <strong>live vehicle GPS</strong> - most accurate result.</span></div>`:'';
+
+  document.getElementById('result-wrap').innerHTML=`
+    <div class="result-card ${cardClass}">
+      ${diag}
+      <div class="result-headline ${hlClass}">${hl}</div>
+      <div class="result-sub">${explain}</div>
+    </div>
+    ${warn}${flip}${radar}
+    <div class="data-grid">
+      <div class="data-row"><span class="dr-label">Line</span><span class="dr-val">${lineName} → ${selDep.direction||'?'}</span></div>
+      <div class="data-row"><span class="dr-label">Exit stop</span><span class="dr-val">${dest.name}</span></div>
+      <div class="data-row"><span class="dr-label">Train heading</span><span class="dr-val">${trainBearing.toFixed(0)}° ${bearingToCard(trainBearing)} <span style="color:var(--faint);font-weight:400;font-size:var(--xs)">(${src})</span></span></div>
+      <div class="data-row"><span class="dr-label">Sun azimuth</span><span class="dr-val">${sunAz.toFixed(1)}° ${cardinalFromAz(sunAz)}</span></div>
+      <div class="data-row"><span class="dr-label">Sun elevation</span><span class="dr-val">${sunEl.toFixed(1)}°</span></div>
+      <div class="data-row"><span class="dr-label">Relative sun angle</span><span class="dr-val">${rel.toFixed(0)}° (${rel<180?'right window':'left window'})</span></div>
+    </div>
+    <div style="text-align:center;padding-bottom:var(--sp10)">
+      <button class="btn btn-ghost" onclick="show('scr-deps')">← Back to departures</button>
+    </div>`;
+}
+
+function buildDiag(side){
+  const leftSun=side==='left';
+  const rightSun=side==='right';
+  const ls=leftSun?'sun':(!rightSun&&side!=='none'&&side!=='back'&&side!=='front'?'shade':'');
+  const rs=rightSun?'sun':(!leftSun&&side!=='none'&&side!=='back'&&side!=='front'?'shade':'');
+  const sa=leftSun?'<div class="sun-from from-left">☀️ →</div>':rightSun?'<div class="sun-from from-right">← ☀️</div>':'';
+  const icon=selDep?.line?.product==='bus'?'🚌':selDep?.line?.product==='tram'?'🚋':'🚆';
+  return `<div class="diagram-wrap">
+    ${sa}
+    <div class="train-box">
+      <div class="seat ${ls}" title="Left side"></div>
+      <span style="font-size:20px;color:var(--faint)">${icon}</span>
+      <div class="seat ${rs}" title="Right side"></div>
+    </div>
+    <div class="dir-label">→ direction of travel</div>
+  </div>`;
+}
+
+function bearingToCard(b){
+  return['N','NE','E','SE','S','SW','W','NW','N'][Math.round(b/45)];
+}
+
+// ── Helpers ────────────────────────────────────────────
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function showErr(msg){
+  document.getElementById('dep-list').innerHTML=`<div class="state-view"><div class="sv-icon">⚠️</div><h2>Error</h2><p>${msg}</p><button class="btn btn-ghost" onclick="show('scr-perm')" style="margin-top:var(--sp4)">← Start over</button></div>`;
+  show('scr-deps');
+}
+function doRefresh(){if(uLat){show('scr-load');updateSunBar(uLat,uLon);loadDeps()}}
+</script>
+</body>
+</html>

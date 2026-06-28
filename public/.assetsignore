@@ -1,0 +1,2 @@
+# Files in public/ that must NOT be uploaded as public client-side assets.
+.assetsignore

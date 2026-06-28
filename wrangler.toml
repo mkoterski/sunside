@@ -1,0 +1,19 @@
+name = "sunside-berlin"
+main = "worker/src/index.js"
+# Set to today's date when you first deploy.
+compatibility_date = "2026-06-27"
+
+# Serve the SPA (public/index.html) as static assets AND run the Worker for /api/*.
+# This is a single free-tier Worker doing both jobs - no separate hosting needed.
+[assets]
+directory = "./public/"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+# Only invoke the Worker script for API paths; everything else serves the static
+# file directly (and those static hits are not even billed).
+run_worker_first = ["/api/*", "/healthz"]
+
+# Recommended: turn on logs/traces so you can watch cache hit rate and any 429s
+# during the demo. Free tier includes a generous observability allowance.
+[observability]
+enabled = true
