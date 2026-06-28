@@ -372,7 +372,7 @@ header{
 // API base is configurable. By default it points at the local proxy path "/api",
 // which the Cloudflare Worker serves (cache + single-flight in front of VBB).
 // To bypass the proxy during local dev, set window.SUNSIDE_API before this script,
-// e.g. <script>window.SUNSIDE_API='https://v6.vbb.transport.rest'</script>
+// e.g. a separate script tag setting window.SUNSIDE_API='https://v6.vbb.transport.rest'
 const API=(typeof window!=='undefined'&&window.SUNSIDE_API)||'/api';
 let uLat=null,uLon=null;
 let allDeps=[];
