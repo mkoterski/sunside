@@ -39,6 +39,11 @@ const TTL = {
 // burst never trips the hard limit. Tokens refill continuously.
 const BUDGET = { capacity: 80, refillPerSec: 80 / 60 };
 
+// Hard ceiling on distinct cache entries. The cache key includes the raw query
+// string, so without this a flood of distinct queries (e.g. jittered radar
+// bounding boxes) could grow the Map until the isolate runs out of memory.
+const MAX_CACHE_ENTRIES = 500;
+
 // Which upstream paths we are willing to proxy. Anything else is rejected so the
 // Worker can't be turned into an open proxy.
 const ALLOW = [
@@ -67,6 +72,25 @@ function takeToken() {
   return false;
 }
 
+// Insert into the cache while keeping it bounded. First drop anything already
+// expired (cheap, and usually enough), then evict oldest-inserted entries until
+// we are back under the ceiling. Map iteration order is insertion order, so the
+// first key is the oldest.
+function setCache(key, entry) {
+  if (memCache.size >= MAX_CACHE_ENTRIES) {
+    const now = Date.now();
+    for (const [k, v] of memCache) {
+      if (v.expires <= now) memCache.delete(k);
+    }
+    while (memCache.size >= MAX_CACHE_ENTRIES) {
+      const oldest = memCache.keys().next().value;
+      if (oldest === undefined) break;
+      memCache.delete(oldest);
+    }
+  }
+  memCache.set(key, entry);
+}
+
 function ttlForPath(path) {
   if (path.startsWith("locations/nearby")) return TTL["locations/nearby"];
   if (path.startsWith("stops/"))           return TTL["stops"];
@@ -79,19 +103,27 @@ function pathAllowed(path) {
   return ALLOW.some((re) => re.test(path));
 }
 
-function cors(resp) {
+// Echo CORS headers only for our own origin. The SPA is served from the same
+// origin as this Worker, so same-origin requests work regardless; we deliberately
+// do NOT send a wildcard, which would turn the proxy into an open CORS proxy any
+// site could call from a browser.
+function withCors(resp, request) {
+  const origin = request.headers.get("Origin");
   const h = new Headers(resp.headers);
-  h.set("Access-Control-Allow-Origin", "*");
-  h.set("Access-Control-Allow-Methods", "GET,OPTIONS");
-  h.set("Access-Control-Allow-Headers", "Content-Type");
+  if (origin && origin === new URL(request.url).origin) {
+    h.set("Access-Control-Allow-Origin", origin);
+    h.set("Vary", "Origin");
+    h.set("Access-Control-Allow-Methods", "GET,OPTIONS");
+    h.set("Access-Control-Allow-Headers", "Content-Type");
+  }
   return new Response(resp.body, { status: resp.status, headers: h });
 }
 
 function jsonResp(body, status, extraHeaders = {}) {
-  return cors(new Response(body, {
+  return new Response(body, {
     status,
     headers: { "Content-Type": "application/json", ...extraHeaders },
-  }));
+  });
 }
 
 /**
@@ -132,7 +164,7 @@ async function getUpstream(path, search) {
     const body = await res.text();
     const entry = { body, status: res.status, expires: Date.now() + ttl * 1000 };
     // Only cache successful responses; let errors retry next time.
-    if (res.ok) memCache.set(key, entry);
+    if (res.ok) setCache(key, entry);
     return entry;
   })();
 
@@ -152,29 +184,40 @@ async function getUpstream(path, search) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    const isApi = url.pathname.startsWith("/api/");
+    const isHealth = url.pathname === "/healthz";
 
     if (request.method === "OPTIONS") {
-      return cors(new Response(null, { status: 204 }));
+      return withCors(new Response(null, { status: 204 }), request);
+    }
+
+    // This is a read-only proxy; only GET is meaningful. Reject everything else
+    // before it can reach the upstream or the metrics endpoint.
+    if ((isApi || isHealth) && request.method !== "GET") {
+      return withCors(
+        jsonResp(JSON.stringify({ error: "method not allowed" }), 405, { "Allow": "GET, OPTIONS" }),
+        request,
+      );
     }
 
     // Health/metrics endpoint - handy during the demo.
-    if (url.pathname === "/healthz") {
+    if (isHealth) {
       refill();
-      return jsonResp(JSON.stringify({
+      return withCors(jsonResp(JSON.stringify({
         ok: true,
         tokensRemaining: Math.floor(tokens),
         cacheEntries: memCache.size,
         inflight: inflight.size,
-      }), 200);
+      }), 200), request);
     }
 
     // API proxy: everything under /api/* maps to the VBB path.
-    if (url.pathname.startsWith("/api/")) {
+    if (isApi) {
       const path = url.pathname.slice("/api/".length).replace(/^\/+/, "");
       if (!pathAllowed(path)) {
-        return jsonResp(JSON.stringify({ error: "path not allowed" }), 403);
+        return withCors(jsonResp(JSON.stringify({ error: "path not allowed" }), 403), request);
       }
-      return getUpstream(path, url.search);
+      return withCors(await getUpstream(path, url.search), request);
     }
 
     // Static assets (the SPA). Served from the bound ASSETS binding.

@@ -470,10 +470,10 @@ function renderDeps(deps){
     const liveTag=d.when&&d.delay!==null?'<span class="live-badge"><span class="live-dot"></span>LIVE</span>':'';
     return `
     <div class="dep-card anim" style="animation-delay:${i*35}ms" onclick="selectDep(${i})">
-      <div class="line-badge ${badgeClass(prod)}">${name}</div>
+      <div class="line-badge ${badgeClass(prod)}">${esc(name)}</div>
       <div class="dep-info">
-        <div class="dep-dest">${dest}</div>
-        <div class="dep-stop">from ${d._sName}</div>
+        <div class="dep-dest">${esc(dest)}</div>
+        <div class="dep-stop">from ${esc(d._sName)}</div>
         ${liveTag}${delayTag}
       </div>
       <div class="dep-time-block">
@@ -499,10 +499,10 @@ async function selectDep(idx){
   // Journey card
   document.getElementById('jc-card').innerHTML=`
     <div class="jc-top">
-      <div class="jc-badge ${badgeClass(prod)}">${name}</div>
+      <div class="jc-badge ${badgeClass(prod)}">${esc(name)}</div>
       <div class="jc-meta">
-        <h3>${selDep.direction||'?'}</h3>
-        <p>${prodLabel} · departs ${timeStr} from ${selDep._sName}</p>
+        <h3>${esc(selDep.direction||'?')}</h3>
+        <p>${prodLabel} · departs ${timeStr} from ${esc(selDep._sName)}</p>
       </div>
     </div>`;
 
@@ -590,7 +590,7 @@ function renderStops(trip){
     return `
     <div class="stop-item ${disabled}" onclick="calcSun(${i},${JSON.stringify(stops).replace(/"/g,'&quot;')})">
       <div class="sdot ${i===0?'origin':''}"></div>
-      <div class="stop-name">${s.name}${i===0?' <span style="color:var(--accent);font-size:var(--xs)">(boarding here)</span>':''}</div>
+      <div class="stop-name">${esc(s.name)}${i===0?' <span style="color:var(--accent);font-size:var(--xs)">(boarding here)</span>':''}</div>
       ${t?`<div class="stop-time">${t}</div>`:''}
     </div>`;
   }).join('');
@@ -678,7 +678,7 @@ function calcSun(stopIdx, stops){
       }
     }
     if(flipAt){
-      flipNote=`The shaded side changes around ${flipAt}. Recommendation below is for the longest part of your ride.`;
+      flipNote=`The shaded side changes around ${esc(flipAt)}. Recommendation below is for the longest part of your ride.`;
     }
   }
 
@@ -749,8 +749,8 @@ function renderResult(trainBearing,sunAz,sunEl,dest,origin,src,flipNote){
     </div>
     ${warn}${flip}${radar}
     <div class="data-grid">
-      <div class="data-row"><span class="dr-label">Line</span><span class="dr-val">${lineName} → ${selDep.direction||'?'}</span></div>
-      <div class="data-row"><span class="dr-label">Exit stop</span><span class="dr-val">${dest.name}</span></div>
+      <div class="data-row"><span class="dr-label">Line</span><span class="dr-val">${esc(lineName)} → ${esc(selDep.direction||'?')}</span></div>
+      <div class="data-row"><span class="dr-label">Exit stop</span><span class="dr-val">${esc(dest.name)}</span></div>
       <div class="data-row"><span class="dr-label">Train heading</span><span class="dr-val">${trainBearing.toFixed(0)}° ${bearingToCard(trainBearing)} <span style="color:var(--faint);font-weight:400;font-size:var(--xs)">(${src})</span></span></div>
       <div class="data-row"><span class="dr-label">Sun azimuth</span><span class="dr-val">${sunAz.toFixed(1)}° ${cardinalFromAz(sunAz)}</span></div>
       <div class="data-row"><span class="dr-label">Sun elevation</span><span class="dr-val">${sunEl.toFixed(1)}°</span></div>
@@ -784,6 +784,13 @@ function bearingToCard(b){
 }
 
 // ── Helpers ────────────────────────────────────────────
+// Escape any value that originates from the VBB API before it goes into innerHTML.
+// Stop names, directions and line names are third-party data; treating them as
+// trusted HTML would be an injection risk.
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,c=>(
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 function show(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');

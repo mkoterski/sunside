@@ -10,12 +10,18 @@ This is the proof-of-concept build, sized for **10-100 concurrent users at zero 
 
 ```
 sunside/
-  public/index.html        the SPA (patched prototype)
+  public/index.html        the SPA — THIS is the canonical, deployed app
   worker/src/index.js       Cloudflare Worker: caching proxy + single-flight + budget
   test/sun-side.test.mjs    pure-logic tests for the bearing / sun-side math
   wrangler.toml             one Worker serves BOTH the SPA and /api/*
   package.json              dev / deploy / test scripts
+  archive/                  earlier prototype/demo iterations, kept for reference only
+  misc/                     design brief and supporting notes
 ```
+
+> `archive/` holds superseded prototype copies (`prototype/`, `demo/`,
+> `prototype-journey-v2/`). They are **not** deployed and may drift from the live
+> app — only `public/index.html` is authoritative.
 
 ## Why a proxy at all
 
