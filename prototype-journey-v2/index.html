@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SunSide · journey prototype</title>
+<style>
+  :root{
+    --sun:#F4A024; --sun-soft:#FBD9A0;
+    --shade:#2B3A55; --shade-soft:#9FB0C9;
+    --paper:#FBF7EF; --card:#fff; --ink:#1C232E; --slate:#6B7280;
+    --tram:#D6492F; --line:#E4DDCE; --neutral:#C9C2B2;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:#EDE6D7; color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    line-height:1.5; min-height:100vh; display:flex; justify-content:center;
+    padding:1.5rem 0;
+  }
+  /* phone frame */
+  .phone{
+    width:100%; max-width:400px; background:var(--paper);
+    border-radius:34px; box-shadow:0 24px 60px rgba(0,0,0,.22), 0 0 0 10px #111;
+    overflow:hidden; position:relative; min-height:760px; display:flex; flex-direction:column;
+  }
+  .notch{height:26px;background:#111;border-radius:0 0 16px 16px;width:140px;margin:0 auto;flex:none}
+  .screen{display:none;flex-direction:column;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .screen.active{display:flex}
+  .pad{padding:1.1rem 1.15rem}
+  /* shared header */
+  .top{display:flex;align-items:center;gap:.6rem;padding:1rem 1.15rem .4rem}
+  .top .back{
+    border:0;background:none;font:inherit;color:var(--slate);font-size:1.3rem;
+    cursor:pointer;line-height:1;padding:.1rem .2rem;
+  }
+  .brand{display:flex;align-items:baseline;gap:.4rem}
+  .brand h1{font-family:"Helvetica Neue",Arial,sans-serif;font-weight:800;font-size:1.15rem;letter-spacing:-.02em;text-transform:uppercase}
+  .brand h1 .s{color:var(--sun)}
+  .brand .tag{font-size:.6rem;letter-spacing:.13em;text-transform:uppercase;color:var(--slate);font-weight:700}
+  h2.scr-title{font-family:"Helvetica Neue",Arial,sans-serif;font-weight:800;font-size:1.35rem;letter-spacing:-.02em;margin:.3rem 0 1rem}
+  .sub{font-size:.82rem;color:var(--slate);margin-top:-.7rem;margin-bottom:1rem}
+  /* context bar (date/time/loc) */
+  .ctx{
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:.7rem .85rem;margin-bottom:1rem;display:grid;gap:.6rem;
+  }
+  .ctx-row{display:flex;align-items:center;justify-content:space-between;gap:.6rem}
+  .ctx-label{font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);font-weight:700}
+  .ctx-val{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.84rem;font-weight:600}
+  .ctx input[type=time],.ctx input[type=date]{
+    font:inherit;font-family:ui-monospace,monospace;font-size:.82rem;border:1px solid var(--line);
+    border-radius:7px;padding:.2rem .4rem;background:var(--paper);color:var(--ink);
+  }
+  .radius-row{display:flex;align-items:center;gap:.7rem}
+  .radius-row input[type=range]{flex:1;accent-color:var(--tram)}
+  .radius-val{font-family:ui-monospace,monospace;font-weight:700;font-size:.8rem;min-width:54px;text-align:right}
+  /* stop list */
+  .stop-card{
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:.8rem .9rem;margin-bottom:.6rem;cursor:pointer;display:flex;align-items:center;
+    justify-content:space-between;gap:.6rem;transition:border-color .15s,transform .08s;
+  }
+  .stop-card:active{transform:scale(.99)}
+  .stop-card:hover{border-color:var(--ink)}
+  .stop-main{min-width:0}
+  .stop-name{font-weight:600;font-size:.94rem}
+  .stop-meta{font-size:.72rem;color:var(--slate);margin-top:.1rem}
+  .stop-lines{display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.35rem}
+  .lpill{font-size:.66rem;font-weight:700;color:#fff;border-radius:4px;padding:.05rem .35rem;letter-spacing:.02em}
+  .lt{background:var(--tram)} .lb{background:#6b4ea0} .lu{background:#1f6fb2} .ls{background:#2e8b57}
+  .dist{font-family:ui-monospace,monospace;font-size:.74rem;color:var(--slate);white-space:nowrap}
+  /* generic option rows (line/dir/dest) */
+  .opt{
+    background:var(--card);border:1.5px solid var(--line);border-radius:12px;
+    padding:.85rem .95rem;margin-bottom:.6rem;cursor:pointer;display:flex;align-items:center;
+    justify-content:space-between;gap:.6rem;transition:border-color .15s,transform .08s;
+  }
+  .opt:active{transform:scale(.99)}
+  .opt[aria-selected=true]{border-color:var(--ink);background:#fff}
+  .opt-l{display:flex;align-items:center;gap:.6rem;min-width:0}
+  .opt-title{font-weight:600;font-size:.92rem}
+  .opt-sub{font-size:.74rem;color:var(--slate)}
+  .chev{color:var(--slate);font-size:1.1rem;flex:none}
+  .dir-group{font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);font-weight:700;margin:1.1rem 0 .55rem;display:flex;align-items:center;gap:.45rem}
+  .dir-group:first-child{margin-top:.2rem}
+  .dir-group .arr{color:var(--tram);font-weight:800}
+  .dir-bar{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin:.2rem 0 .15rem}
+  .dir-head{font-size:.74rem;letter-spacing:.04em;text-transform:uppercase;color:var(--ink);font-weight:800;display:flex;align-items:center;gap:.4rem;min-width:0}
+  .dir-head .arr{color:var(--tram);font-weight:800;flex:none}
+  .flip-btn{flex:none;border:1.5px solid var(--ink);background:#fff;color:var(--ink);font:inherit;font-size:.74rem;font-weight:700;border-radius:9px;padding:.35rem .65rem;cursor:pointer}
+  .flip-btn:active{transform:scale(.97)}
+  .dir-otherline{font-size:.7rem;color:var(--slate);margin-bottom:.7rem}
+  .filter-input{
+    width:100%;font:inherit;font-size:.92rem;border:1.5px solid var(--line);border-radius:11px;
+    padding:.7rem .85rem;background:#fff;color:var(--ink);margin-bottom:.7rem;
+  }
+  .filter-input:focus{outline:none;border-color:var(--ink)}
+  .filter-input::placeholder{color:var(--neutral)}
+  .stop-row{
+    background:var(--card);border:1px solid var(--line);border-radius:11px;
+    padding:.7rem .9rem;margin-bottom:.5rem;cursor:pointer;display:flex;align-items:center;
+    justify-content:space-between;gap:.6rem;transition:border-color .15s,transform .08s;
+  }
+  .stop-row:active{transform:scale(.99)}
+  .stop-row:hover{border-color:var(--ink)}
+  .stop-row .opt-title{font-weight:600;font-size:.9rem}
+  /* primary button */
+  .cta{
+    margin:auto 0 0;padding:1rem 1.15rem;
+  }
+  .btn{
+    width:100%;border:0;border-radius:13px;background:var(--tram);color:#fff;
+    font:inherit;font-weight:700;font-size:1rem;padding:.95rem;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:.5rem;
+  }
+  .btn:disabled{background:var(--neutral);cursor:not-allowed}
+  .btn.ghost{background:none;color:var(--ink);border:1.5px solid var(--ink)}
+  /* ── result screen (from demo) ── */
+  .verdict{border:1.5px solid var(--ink);border-radius:14px;overflow:hidden;margin-bottom:1.1rem;background:#fff}
+  .verdict .head{padding:1rem 1.1rem .85rem}
+  .eyebrow{font-size:.64rem;letter-spacing:.15em;text-transform:uppercase;color:var(--slate);font-weight:700;margin-bottom:.35rem}
+  .big{font-family:"Helvetica Neue",Arial,sans-serif;font-weight:800;font-size:1.7rem;letter-spacing:-.02em;line-height:1.05;display:flex;align-items:center;gap:.55rem}
+  .big .dir{color:var(--tram)}
+  .dir-arrow{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;flex:none;border-radius:11px;background:var(--tram);color:#fff}
+  .dir-arrow[hidden]{display:none}
+  .dir-arrow.point-right{transform:scaleX(-1)}
+  .why{font-size:.8rem;color:var(--slate);margin-top:.5rem}
+  .meter{display:flex;height:30px;font-size:.66rem;font-weight:700;color:#fff}
+  .meter span{display:flex;align-items:center;justify-content:center;overflow:hidden;transition:flex-basis .4s ease}
+  .m-right{background:var(--shade)} .m-left{background:var(--sun);color:var(--ink)} .m-neutral{background:var(--neutral);color:var(--ink)}
+  .meter-key{display:flex;gap:.8rem;font-size:.66rem;color:var(--slate);padding:.45rem 1.1rem;border-top:1px solid var(--line);flex-wrap:wrap}
+  .meter-key b{color:var(--ink)}
+  .spine-title{font-size:.64rem;letter-spacing:.13em;text-transform:uppercase;color:var(--slate);font-weight:700;margin:.4rem 0 .7rem}
+  .spine{position:relative}
+  .seg{display:grid;grid-template-columns:16px 1fr auto;gap:.6rem;align-items:start}
+  .seg .rail{position:relative;display:flex;justify-content:center}
+  .seg .rail::before{content:"";position:absolute;top:0;bottom:0;width:4px;background:var(--neutral)}
+  .seg.s-right .rail::before{background:var(--shade)}
+  .seg.s-left .rail::before{background:var(--sun)}
+  .seg .dot{width:10px;height:10px;border-radius:50%;background:#fff;border:2.5px solid var(--ink);margin-top:2px;z-index:1}
+  .seg.boarding .dot{background:var(--tram);border-color:var(--tram);width:13px;height:13px}
+  .seg.exit .dot{background:var(--ink)}
+  .seg.current .dot{background:var(--sun);border-color:var(--tram);box-shadow:0 0 0 4px rgba(244,160,36,.35)}
+  .seg .body{padding-bottom:.9rem;min-width:0}
+  .seg .stop{font-size:.82rem;font-weight:600}
+  .seg.current .stop{color:var(--tram)}
+  .seg .leg{font-family:ui-monospace,monospace;font-size:.64rem;color:var(--slate);margin-top:.1rem}
+  .flag{display:inline-block;font-size:.58rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:.05rem .3rem;border-radius:4px;margin-left:.35rem;vertical-align:middle}
+  .f-board{background:var(--tram);color:#fff} .f-exit{background:var(--ink);color:#fff} .f-flip{background:var(--sun);color:var(--ink)} .f-now{background:var(--sun);color:var(--ink)}
+  .seg .side{font-family:ui-monospace,monospace;font-size:.62rem;font-weight:700;text-align:right;white-space:nowrap;padding-top:1px}
+  .side.right{color:var(--shade)} .side.left{color:var(--sun)} .side.neutral{color:var(--slate)}
+  /* journey mode */
+  .journey-status{
+    background:var(--ink);color:#fff;border-radius:14px;padding:1rem 1.1rem;margin-bottom:1rem;
+  }
+  .journey-status .now-seg{font-size:.66rem;letter-spacing:.13em;text-transform:uppercase;color:var(--sun);font-weight:700}
+  .journey-status .now-stops{font-size:1.05rem;font-weight:700;margin-top:.3rem;line-height:1.25}
+  .journey-status .now-side{font-size:.8rem;margin-top:.5rem;color:var(--shade-soft)}
+  .journey-status .now-side b{color:#fff}
+  .src-badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.58rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;background:rgba(255,255,255,.15);padding:.15rem .4rem;border-radius:5px;margin-left:auto}
+  .play-row{display:flex;align-items:center;gap:.6rem;margin-top:.7rem}
+  .play-btn{width:32px;height:32px;border-radius:50%;background:var(--sun);color:var(--ink);border:0;font-size:.8rem;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none;line-height:1}
+  .play-btn:active{transform:scale(.95)}
+  .play-meta{font-size:.64rem;color:var(--shade-soft)}
+  .play-meta b{color:#fff}
+  .routehead{display:flex;align-items:center;justify-content:space-between;font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);font-weight:700;margin:.2rem 0 .6rem}
+  /* scrollable route list with vertical progress bar */
+  .listwrap{position:relative;flex:1;min-height:200px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .vbar{position:absolute;left:5px;top:0;width:5px;background:var(--line);border-radius:3px;height:100%}
+  .vbar .vfill{position:absolute;left:0;top:0;width:100%;background:var(--sun);border-radius:3px;height:0;transition:height .6s ease}
+  .vbar .vdot{position:absolute;left:50%;width:14px;height:14px;border-radius:50%;background:var(--sun);border:3px solid var(--tram);transform:translate(-50%,-50%);box-shadow:0 0 0 5px rgba(244,160,36,.3);top:0;transition:top .6s ease}
+  .seg.passed{opacity:.4}
+  .seg.current .dot{background:var(--sun);border-color:var(--tram);box-shadow:0 0 0 4px rgba(244,160,36,.35)}
+  .fadebottom{position:sticky;bottom:0;left:0;right:0;height:34px;margin-top:-34px;background:linear-gradient(transparent,var(--paper));pointer-events:none}
+  .demo-note{font-size:.64rem;color:var(--slate);background:#fff;border:1px dashed var(--neutral);border-radius:9px;padding:.5rem .65rem;margin-bottom:1rem;line-height:1.5}
+  .foot{margin-top:1.2rem;font-size:.66rem;color:var(--slate);line-height:1.55;border-top:1px solid var(--line);padding-top:.8rem}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="notch"></div>
+
+  <!-- ─────────── SCREEN 1: nearby stops ─────────── -->
+  <section class="screen active" id="s1">
+    <div class="top">
+      <div class="brand"><h1>Sun<span class="s">Side</span></h1><span class="tag">prototype</span></div>
+    </div>
+    <div class="pad">
+      <h2 class="scr-title">Stops near you</h2>
+      <div class="ctx">
+        <div class="ctx-row">
+          <span class="ctx-label">Location</span>
+          <span class="ctx-val" id="ctx-loc">📍 Wedding, Berlin</span>
+        </div>
+        <div class="ctx-row">
+          <span class="ctx-label">Date</span>
+          <input type="date" id="ctx-date">
+        </div>
+        <div class="ctx-row">
+          <span class="ctx-label">Time</span>
+          <input type="time" id="ctx-time">
+        </div>
+        <div class="ctx-row">
+          <span class="ctx-label">Radius</span>
+          <span class="radius-row" style="flex:1;max-width:200px">
+            <input type="range" id="radius" min="200" max="1200" step="100" value="700">
+            <span class="radius-val" id="radius-val">700 m</span>
+          </span>
+        </div>
+      </div>
+      <div id="stop-list"></div>
+      <div class="foot">Auto-detected location, date and time — all editable above. Adjust the radius to see more or fewer stops. (Prototype: stops and data are fixed sample values.)</div>
+    </div>
+  </section>
+
+  <!-- ─────────── SCREEN 2: line → all stops (grouped by direction) ─────────── -->
+  <section class="screen" id="s2">
+    <div class="top">
+      <button class="back" id="s2-back">‹</button>
+      <div class="brand"><h1>Sun<span class="s">Side</span></h1></div>
+    </div>
+    <div class="pad" style="display:flex;flex-direction:column;flex:1">
+      <h2 class="scr-title" id="s2-title">Hugenottenplatz</h2>
+      <div class="sub" id="s2-step">Choose your line</div>
+      <div id="s2-options" style="flex:1"></div>
+    </div>
+  </section>
+
+  <!-- ─────────── SCREEN 3: result (the prepared demo) ─────────── -->
+  <section class="screen" id="s3">
+    <div class="top">
+      <button class="back" data-to="s2">‹</button>
+      <div class="brand"><h1>Sun<span class="s">Side</span></h1></div>
+    </div>
+    <div class="pad">
+      <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.8rem;flex-wrap:wrap">
+        <span class="lpill lt" style="font-size:.72rem;padding:.1rem .45rem">Tram 50</span>
+        <span style="font-size:.8rem;color:var(--slate)" id="s3-route">Hugenottenplatz → U Seestr.</span>
+      </div>
+      <div class="verdict">
+        <div class="head">
+          <div class="eyebrow">Where to sit</div>
+          <div class="big">
+            <span id="r-arrow" class="dir-arrow" hidden aria-hidden="true">
+              <svg viewBox="0 0 40 32" width="40" height="32"><path d="M22 4 L6 16 L22 28 M6 16 H36" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <span>Sit on the <span class="dir" id="r-dir">…</span></span>
+          </div>
+          <div class="why" id="r-why"></div>
+        </div>
+        <div class="meter">
+          <span class="m-right" id="r-mr"></span><span class="m-neutral" id="r-mn"></span><span class="m-left" id="r-ml"></span>
+        </div>
+        <div class="meter-key">
+          <span><b id="r-kr">0</b> right shaded</span><span><b id="r-kl">0</b> left shaded</span><span><b id="r-kn">0</b> even</span>
+        </div>
+      </div>
+      <button class="btn" id="s3-follow" style="margin-bottom:1.1rem">▶ Follow the ride</button>
+      <div class="spine-title">Stop by stop · <span id="r-count">0</span> segments</div>
+      <div class="spine" id="r-spine"></div>
+    </div>
+  </section>
+
+  <!-- ─────────── SCREEN 4: follow the ride (auto-advancing) ─────────── -->
+  <section class="screen" id="s4">
+    <div class="top">
+      <button class="back" data-to="s3">‹</button>
+      <div class="brand"><h1>Sun<span class="s">Side</span></h1><span class="tag" id="j-livetag">live</span></div>
+    </div>
+    <div class="pad" style="display:flex;flex-direction:column;flex:1;min-height:0">
+      <div class="journey-status">
+        <div class="now-seg" id="j-seglabel">Now · stop 1 of —</div>
+        <div class="now-stops" id="j-stops">—</div>
+        <div class="now-side" id="j-side">—</div>
+        <div class="play-row">
+          <button class="play-btn" id="j-play" aria-label="Pause">❚❚</button>
+          <span class="play-meta" id="j-playmeta"><b>Playing</b> · auto-advancing · tap to pause</span>
+          <span class="src-badge" id="j-src">◐ clock</span>
+        </div>
+      </div>
+      <div class="routehead">
+        <span>Route · auto-scrolling</span><span id="j-progresstext">1 / —</span>
+      </div>
+      <div class="listwrap" id="j-listwrap">
+        <div class="vbar"><div class="vfill" id="j-vfill"></div><div class="vdot" id="j-vdot"></div></div>
+        <div class="spine" id="j-spine" style="margin-left:24px"></div>
+        <div class="fadebottom"></div>
+      </div>
+      <div class="demo-note" style="margin-top:.8rem;margin-bottom:0">
+        <b>Prototype.</b> The ride auto-advances on a timer. A real ride would use the
+        live clock against scheduled times, switching to GPS (VBB radar) when the vehicle
+        is located. Tap the button to pause/resume; scrubbing isn't needed.
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+// ───────────────── shared geometry + sun math (verified) ─────────────────
+const R=Math.PI/180;
+function bearing(la1,lo1,la2,lo2){const dL=(lo2-lo1)*R;const y=Math.sin(dL)*Math.cos(la2*R);const x=Math.cos(la1*R)*Math.sin(la2*R)-Math.sin(la1*R)*Math.cos(la2*R)*Math.cos(dL);return(Math.atan2(y,x)*180/Math.PI+360)%360;}
+function haversine(la1,lo1,la2,lo2){const Rk=6371,dLa=(la2-la1)*R,dLo=(lo2-lo1)*R;const a=Math.sin(dLa/2)**2+Math.cos(la1*R)*Math.cos(la2*R)*Math.sin(dLo/2)**2;return Rk*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
+function sunPosition(date,lat,lon){
+  const rad=Math.PI/180,deg=180/Math.PI;
+  const jd=date.getTime()/86400000+2440587.5,n=jd-2451545.0;
+  let L=(280.460+0.9856474*n)%360;if(L<0)L+=360;
+  let g=(357.528+0.9856003*n)%360;if(g<0)g+=360;
+  const lambda=(L+1.915*Math.sin(g*rad)+0.020*Math.sin(2*g*rad))%360;
+  const eps=23.439-0.0000004*n;
+  const ra=Math.atan2(Math.cos(eps*rad)*Math.sin(lambda*rad),Math.cos(lambda*rad))*deg;
+  const dec=Math.asin(Math.sin(eps*rad)*Math.sin(lambda*rad))*deg;
+  const gmst=(280.46061837+360.98564736629*n)%360;
+  let lst=(gmst+lon)%360;if(lst<0)lst+=360;
+  let H=(lst-ra)%360;if(H<-180)H+=360;if(H>180)H-=360;
+  const Hr=H*rad,latr=lat*rad,decr=dec*rad;
+  const el=Math.asin(Math.sin(latr)*Math.sin(decr)+Math.cos(latr)*Math.cos(decr)*Math.cos(Hr))*deg;
+  let az=Math.atan2(-Math.sin(Hr),Math.tan(decr)*Math.cos(latr)-Math.sin(latr)*Math.cos(Hr))*deg;
+  return {az:(az+360)%360,el};
+}
+function sideForBearing(sunAz,b){const rel=(sunAz-b+360)%360;if(rel>=25&&rel<155)return'right';if(rel>=205&&rel<335)return'left';return'neutral';}
+const shadeOf=s=>s==='left'?'right':s==='right'?'left':'neutral';
+const card=b=>['N','NE','E','SE','S','SW','W','NW','N'][Math.round(b/45)];
+
+// ───────────────── fake data ─────────────────
+const LAT=52.55, LON=13.40;
+
+// Tram 50 route toward Seestr (verified coords). [name, lat, lon]
+const TRAM50=[
+  ["Hugenottenplatz",52.60599,13.41944],["Arnouxstr.",52.60680,13.42600],["Navarraplatz",52.60720,13.43000],
+  ["Französisch Buchholz Kirche",52.60721,13.43373],["Blankenfelder Str.",52.60400,13.43050],["Rosenthaler Str.",52.60050,13.42650],
+  ["Marienstr./Pasewalker Str.",52.59700,13.42400],["Pasewalker/Blankenburger Weg",52.59300,13.42250],["Pankower Str.",52.58900,13.42050],
+  ["Galenusstr.",52.58450,13.41850],["Pankow-Heinersdorf",52.58050,13.41750],["Würtzstr.",52.57750,13.41600],
+  ["Mendelstr.",52.57500,13.41450],["Stiftsweg",52.57250,13.41300],["Pankow Kirche",52.57000,13.41150],
+  ["S+U Pankow",52.56640,13.41052],["Masurenstr.",52.56250,13.41200],["U Vinetastr.",52.55934,13.41343],
+  ["Schönhauser Allee/Bornholmer Str.",52.55750,13.40600],["Schönfließer Str.",52.55600,13.40200],["Björnsonstr.",52.55550,13.39950],
+  ["S Bornholmer Str.",52.55451,13.39792],["Grüntaler Str.",52.55500,13.38900],["Osloer Str./Prinzenallee",52.55600,13.38100],
+  ["Drontheimer Str.",52.55650,13.37700],["U Osloer Str.",52.55680,13.37333],["Louise-Schroeder-Platz",52.55704,13.36635],
+  ["Osram-Höfe",52.55300,13.35800],["U Seestr.",52.54985,13.35305],
+];
+
+// Sample nearby stops for screen 1 (fake distances + served lines)
+const STOPS=[
+  {name:"Hugenottenplatz", dist:120, lines:[["50","lt"]], hasRoute:true},
+  {name:"Französisch Buchholz Kirche", dist:340, lines:[["50","lt"],["150","lb"]]},
+  {name:"S+U Pankow", dist:560, lines:[["50","lt"],["M1","lt"],["255","lb"]]},
+  {name:"U Vinetastr.", dist:680, lines:[["50","lt"],["U2","lu"]]},
+  {name:"Rathaus Pankow", dist:790, lines:[["M1","lt"],["155","lb"]]},
+  {name:"S Bornholmer Str.", dist:960, lines:[["50","lt"],["S1","ls"],["S2","ls"]]},
+  {name:"Wollankstr.", dist:1080, lines:[["50","lt"],["S25","ls"]]},
+];
+
+// the one fully-wired trip
+const DIRECTIONS_50=[
+  {label:"toward Virchow-Klinikum", sub:"via U Seestr., Wedding", route:TRAM50},
+  {label:"toward Guyotstr.", sub:"via Pankow, Französisch Buchholz", route:[...TRAM50].reverse()},
+];
+
+// ───────────────── app state ─────────────────
+const state={ when:new Date(), stop:null, line:null, dir:null, route:null, destIdx:null, s2step:0 };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById(id).scrollTop=0;
+}
+
+// ───────────────── SCREEN 1 ─────────────────
+function initContext(){
+  const n=state.when;
+  document.getElementById('ctx-date').value=n.toISOString().slice(0,10);
+  document.getElementById('ctx-time').value=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+}
+function readContext(){
+  const d=document.getElementById('ctx-date').value, t=document.getElementById('ctx-time').value;
+  if(d&&t){const dt=new Date(d+'T'+t);if(!isNaN(dt))state.when=dt;}
+}
+function renderStops(){
+  const radius=+document.getElementById('radius').value;
+  document.getElementById('radius-val').textContent=radius+' m';
+  const list=document.getElementById('stop-list');
+  const shown=STOPS.filter(s=>s.dist<=radius);
+  list.innerHTML=shown.map((s,i)=>{
+    const lines=s.lines.map(([n,c])=>`<span class="lpill ${c}">${n}</span>`).join('');
+    return `<div class="stop-card" data-stop="${STOPS.indexOf(s)}">
+      <div class="stop-main">
+        <div class="stop-name">${s.name}</div>
+        <div class="stop-lines">${lines}</div>
+      </div>
+      <div class="dist">${s.dist} m</div>
+    </div>`;
+  }).join('') || `<div class="sub">No stops within ${radius} m. Widen the radius.</div>`;
+  list.querySelectorAll('.stop-card').forEach(c=>c.addEventListener('click',()=>openStop(+c.dataset.stop)));
+}
+
+// ───────────────── SCREEN 2 ─────────────────
+function openStop(idx){
+  state.stop=STOPS[idx]; state.line=null; state.route=null; state.destIdx=null; state.s2step=0;
+  state.s2dir=0; state.s2filter='';
+  document.getElementById('s2-title').textContent=state.stop.name;
+  renderS2();
+  show('s2');
+}
+function renderS2(){
+  const step=state.s2step;
+  const stepEl=document.getElementById('s2-step');
+  const opt=document.getElementById('s2-options');
+
+  if(step===0){ // choose line — tapping advances straight to the stop list
+    stepEl.textContent='Choose your line';
+    opt.innerHTML=state.stop.lines.map(([n,c],i)=>`
+      <div class="opt" data-line="${i}">
+        <div class="opt-l"><span class="lpill ${c}" style="font-size:.78rem;padding:.15rem .5rem">${n}</span>
+        <span class="opt-title">Line ${n}</span></div><span class="chev">›</span>
+      </div>`).join('');
+    opt.querySelectorAll('.opt').forEach(o=>o.addEventListener('click',()=>{
+      state.line=+o.dataset.line; state.s2step=1; state.s2dir=0; state.s2filter=''; renderS2();
+    }));
+  }else{ // show stops for ONE direction, with flip + type-to-filter
+    const [lineName]=state.stop.lines[state.line];
+    stepEl.textContent='Where are you going?';
+    if(lineName!=='50'){
+      opt.innerHTML=`<div class="demo-note" style="margin:0">This line isn't wired with route data in the prototype. Go back and pick <b>Tram 50</b> at <b>Hugenottenplatz</b> for the full worked example.</div>`;
+      return;
+    }
+    if(state.s2dir==null)state.s2dir=0;        // default: first (forward) direction
+    if(state.s2filter==null)state.s2filter='';
+    const d=DIRECTIONS_50[state.s2dir];
+    const other=DIRECTIONS_50[state.s2dir===0?1:0];
+
+    // control bar: direction heading + flip button, then filter input
+    opt.innerHTML=`
+      <div class="dir-bar">
+        <div class="dir-head"><span class="arr">→</span> ${d.label}</div>
+        <button class="flip-btn" id="flip-dir">⇄ Flip</button>
+      </div>
+      <div class="dir-otherline">Other way: ${other.label.replace('toward ','')}</div>
+      <input type="text" id="dest-filter" class="filter-input" placeholder="Type a destination stop…" autocomplete="off" value="${state.s2filter.replace(/"/g,'&quot;')}">
+      <div id="dest-rows"></div>`;
+
+    const renderRows=()=>{
+      const q=state.s2filter.trim().toLowerCase();
+      const rows=d.route.slice(1)
+        .map((s,i)=>({name:s[0],idx:i+1}))
+        .filter(r=>!q||r.name.toLowerCase().includes(q));
+      const box=document.getElementById('dest-rows');
+      box.innerHTML = rows.length
+        ? rows.map(r=>`<div class="stop-row" data-dest="${r.idx}">
+            <div class="opt-title">${r.name}</div>
+            <div class="opt-sub">${r.idx} stop${r.idx>1?'s':''}</div>
+          </div>`).join('')
+        : `<div class="sub" style="margin:.6rem 0">No stops match “${state.s2filter}”. Try fewer letters or flip the direction.</div>`;
+      box.querySelectorAll('.stop-row').forEach(o=>o.addEventListener('click',()=>{
+        state.route=d.route; state.destIdx=+o.dataset.dest;
+        computeResult(); show('s3');
+      }));
+    };
+    renderRows();
+
+    document.getElementById('flip-dir').addEventListener('click',()=>{
+      state.s2dir=state.s2dir===0?1:0; renderS2();
+      // keep focus flow natural: refocus filter after re-render
+    });
+    const fi=document.getElementById('dest-filter');
+    fi.addEventListener('input',e=>{state.s2filter=e.target.value;renderRows();});
+  }
+}
+
+// ───────────────── core compute (shared by result + journey) ─────────────────
+function computeTrip(){
+  // sub-route from boarding (index 0) to chosen destination
+  const full=state.route, dest=state.destIdx;
+  const sub=full.slice(0,dest+1);
+  const {az,el}=sunPosition(state.when,LAT,LON);
+  const segs=[]; const weight={left:0,right:0,neutral:0};
+  for(let i=0;i<sub.length-1;i++){
+    const [n1,la1,lo1]=sub[i],[n2,la2,lo2]=sub[i+1];
+    const b=bearing(la1,lo1,la2,lo2), km=haversine(la1,lo1,la2,lo2);
+    const sun=el<=0?'neutral':sideForBearing(az,b);
+    const shade=shadeOf(sun); weight[shade]+=km;
+    segs.push({from:n1,to:n2,bearing:b,km,sun,shade});
+  }
+  let first=null;
+  segs.forEach(s=>{if(s.shade==='neutral')return;if(first===null)first=s.shade;else if(s.shade!==first){s.flip=true;first=s.shade;}});
+  return {az,el,segs,weight,sub};
+}
+
+// ───────────────── SCREEN 3: result ─────────────────
+function computeResult(){
+  const {az,el,segs,weight,sub}=computeTrip();
+  state._trip={az,el,segs,weight,sub};
+  document.getElementById('s3-route').textContent=`${sub[0][0]} → ${sub[sub.length-1][0]}`;
+  const total=weight.left+weight.right+weight.neutral;
+  const win=weight.right>weight.left?'right':weight.left>weight.right?'left':'either side';
+  document.getElementById('r-dir').textContent=win;
+  const arrow=document.getElementById('r-arrow');
+  if(el>0&&(win==='left'||win==='right')){arrow.hidden=false;arrow.classList.toggle('point-right',win==='right');}
+  else arrow.hidden=true;
+  const why=document.getElementById('r-why');
+  if(el<=0)why.textContent='The sun is below the horizon — no direct sunlight on either side.';
+  else if(win==='either side')why.textContent=`Sun at az ${az.toFixed(0)}° (${card(az)}). The route's turns split it evenly — neither side wins.`;
+  else{
+    const a=(win==='right'?weight.right:weight.left).toFixed(1),b=(win==='right'?weight.left:weight.right).toFixed(1);
+    const m=Math.abs(weight.right-weight.left),str=m<0.8?'a narrow edge':m<2.5?'a clear edge':'a strong edge';
+    why.textContent=`Sun at az ${az.toFixed(0)}° (${card(az)}), elev ${el.toFixed(0)}°. The ${win} seat is shaded ${a} km vs ${b} km — ${str}.`;
+  }
+  const pct=v=>total>0?v/total*100:0;
+  document.getElementById('r-mr').style.flexBasis=pct(weight.right)+'%';
+  document.getElementById('r-ml').style.flexBasis=pct(weight.left)+'%';
+  document.getElementById('r-mn').style.flexBasis=pct(weight.neutral)+'%';
+  document.getElementById('r-mr').textContent=weight.right>0.6?'RIGHT':'';
+  document.getElementById('r-ml').textContent=weight.left>0.6?'LEFT':'';
+  document.getElementById('r-kr').textContent=weight.right.toFixed(1)+' km';
+  document.getElementById('r-kl').textContent=weight.left.toFixed(1)+' km';
+  document.getElementById('r-kn').textContent=weight.neutral.toFixed(1)+' km';
+  document.getElementById('r-count').textContent=segs.length;
+  renderSpine('r-spine',segs,sub,-1);
+}
+
+function renderSpine(elId,segs,sub,currentSeg){
+  let html='';
+  segs.forEach((s,i)=>{
+    const board=i===0?'<span class="flag f-board">board</span>':'';
+    const flip=s.flip?'<span class="flag f-flip">flips</span>':'';
+    const now=(i===currentSeg)?'<span class="flag f-now">now</span>':'';
+    const sideTxt=s.shade==='neutral'?'even':(s.shade==='right'?'shade →':'← shade');
+    html+=`<div class="seg s-${s.shade} ${i===0?'boarding':''} ${i===currentSeg?'current':''}">
+      <div class="rail"><div class="dot"></div></div>
+      <div class="body"><div class="stop">${s.from}${board}${flip}${now}</div>
+      <div class="leg">${s.bearing.toFixed(0)}° ${card(s.bearing)} · ${s.km.toFixed(2)} km</div></div>
+      <div class="side ${s.shade}">${sideTxt}</div>
+    </div>`;
+  });
+  const last=sub[sub.length-1][0];
+  html+=`<div class="seg s-neutral exit"><div class="rail" style="height:13px"><div class="dot"></div></div>
+    <div class="body"><div class="stop">${last}<span class="flag f-exit">exit</span></div></div><div class="side neutral"></div></div>`;
+  document.getElementById(elId).innerHTML=html;
+}
+
+// ───────────────── SCREEN 4: auto-advancing journey ─────────────────
+const journey={timer:null, seg:0, playing:false, total:0};
+const SEG_MS=2200; // dwell per segment in the simulation
+
+document.getElementById('s3-follow').addEventListener('click',()=>{startJourney();show('s4');});
+
+function startJourney(){
+  journey.seg=0;
+  journey.total=state._trip.segs.length;
+  renderJourney();
+  setPlaying(true);
+}
+function setPlaying(on){
+  journey.playing=on;
+  const btn=document.getElementById('j-play');
+  const meta=document.getElementById('j-playmeta');
+  btn.textContent = on ? '❚❚' : '▶';
+  btn.setAttribute('aria-label', on ? 'Pause' : 'Play');
+  meta.innerHTML = on ? '<b>Playing</b> · auto-advancing · tap to pause'
+                      : '<b>Paused</b> · tap to resume';
+  clearInterval(journey.timer);
+  if(on){
+    journey.timer=setInterval(()=>{
+      if(journey.seg < journey.total-1){ journey.seg++; renderJourney(); }
+      else { setPlaying(false); arrivedAtEnd(); }
+    }, SEG_MS);
+  }
+}
+function arrivedAtEnd(){
+  document.getElementById('j-seglabel').textContent='Arrived';
+  const {sub}=state._trip;
+  document.getElementById('j-stops').textContent=sub[sub.length-1][0];
+  document.getElementById('j-side').innerHTML='You’ve reached your stop. Enjoy the shade.';
+  document.getElementById('j-playmeta').innerHTML='<b>Arrived</b> · tap to replay';
+}
+document.getElementById('j-play').addEventListener('click',()=>{
+  if(!journey.playing && journey.seg>=journey.total-1){ journey.seg=0; renderJourney(); setPlaying(true); }
+  else setPlaying(!journey.playing);
+});
+
+function renderJourney(){
+  const {segs,sub}=state._trip;
+  const cur=journey.seg, seg=segs[cur];
+  document.getElementById('j-seglabel').textContent=`Now · stop ${cur+1} of ${sub.length}`;
+  document.getElementById('j-stops').textContent=`${seg.from} → ${seg.to}`;
+  document.getElementById('j-side').innerHTML = seg.shade==='neutral'
+    ? 'On this stretch the sun is ahead or behind — <b>either side</b> is fine.'
+    : `On this stretch, shade is on the <b>${seg.shade.toUpperCase()}</b>.`;
+  document.getElementById('j-progresstext').textContent=`${cur+1} / ${sub.length}`;
+  // source badge: GPS once moving, clock at the very start
+  const src=document.getElementById('j-src');
+  if(cur>0){src.textContent='📡 GPS';src.style.background='rgba(244,160,36,.3)';}
+  else{src.textContent='◐ clock';src.style.background='rgba(255,255,255,.15)';}
+  // render spine with passed/current classes
+  renderJourneySpine(segs,sub,cur);
+  // vertical bar fill + dot, and auto-scroll current stop near the top
+  requestAnimationFrame(()=>positionBarAndScroll(cur));
+}
+
+function renderJourneySpine(segs,sub,cur){
+  let html='';
+  segs.forEach((s,i)=>{
+    const board=i===0?'<span class="flag f-board">board</span>':'';
+    const flip=s.flip?'<span class="flag f-flip">flips</span>':'';
+    const now=(i===cur)?'<span class="flag f-now">now</span>':'';
+    const cls=[`s-${s.shade}`, i===0?'boarding':'', i===cur?'current':'', i<cur?'passed':''].join(' ');
+    const sideTxt=s.shade==='neutral'?'even':(s.shade==='right'?'shade →':'← shade');
+    html+=`<div class="seg ${cls}" data-seg="${i}">
+      <div class="rail"><div class="dot"></div></div>
+      <div class="body"><div class="stop">${s.from}${board}${flip}${now}</div>
+      <div class="leg">${s.bearing.toFixed(0)}° ${card(s.bearing)} · ${s.km.toFixed(2)} km</div></div>
+      <div class="side ${s.shade}">${sideTxt}</div></div>`;
+  });
+  const last=sub[sub.length-1][0];
+  html+=`<div class="seg s-neutral exit" data-seg="${segs.length}"><div class="rail" style="height:13px"><div class="dot"></div></div>
+    <div class="body"><div class="stop">${last}<span class="flag f-exit">exit</span></div></div><div class="side neutral"></div></div>`;
+  document.getElementById('j-spine').innerHTML=html;
+}
+
+function positionBarAndScroll(cur){
+  const wrap=document.getElementById('j-listwrap');
+  const spine=document.getElementById('j-spine');
+  const segEl=spine.querySelector(`.seg[data-seg="${cur}"]`);
+  if(!segEl)return;
+  // current dot's vertical centre, relative to the scrollable content
+  const dot=segEl.querySelector('.dot');
+  const contentTop=spine.offsetTop;
+  const dotCenter=segEl.offsetTop+contentTop+(dot.offsetTop+dot.offsetHeight/2);
+  // vertical bar fill to the dot, dot marker at the dot
+  const vfill=document.getElementById('j-vfill');
+  const vdot=document.getElementById('j-vdot');
+  vfill.style.height=dotCenter+'px';
+  vdot.style.top=dotCenter+'px';
+  // auto-scroll so the current stop sits near the top (~70px down)
+  const target=segEl.offsetTop-70;
+  wrap.scrollTo({top:Math.max(0,target), behavior:'smooth'});
+}
+
+// stop the timer when leaving screen 4
+function stopJourney(){ clearInterval(journey.timer); journey.playing=false; }
+
+// ───────────────── wire-up ─────────────────
+document.querySelectorAll('.back[data-to]').forEach(b=>b.addEventListener('click',()=>{
+  if(b.closest('#s4'))stopJourney();
+  show(b.dataset.to);
+}));
+// screen 2 back: from the stop list go back to line choice; from line choice leave to s1
+document.getElementById('s2-back').addEventListener('click',()=>{
+  if(state.s2step===1){state.s2step=0;renderS2();}
+  else show('s1');
+});
+document.getElementById('radius').addEventListener('input',renderStops);
+document.getElementById('ctx-date').addEventListener('change',readContext);
+document.getElementById('ctx-time').addEventListener('change',readContext);
+
+initContext();
+renderStops();
+</script>
+</body>
+</html>
