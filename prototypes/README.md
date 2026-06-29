@@ -5,6 +5,9 @@ single `index.html` you can open directly in any browser — no server, no API, 
 build step, no external dependencies. They share the verified sun-position maths
 and per-segment shade logic, and each has its own README with the details.
 
+Open [`index.html`](index.html) in this folder for a hub page that links to every
+prototype, or jump straight to one from the table below.
+
 The deployed app lives in `public/index.html`; these are exploratory builds, not
 the production client.
 
