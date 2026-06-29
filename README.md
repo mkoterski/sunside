@@ -15,13 +15,15 @@ sunside/
   test/sun-side.test.mjs    pure-logic tests for the bearing / sun-side math
   wrangler.toml             one Worker serves BOTH the SPA and /api/*
   package.json              dev / deploy / test scripts
-  archive/                  earlier prototype/demo iterations, kept for reference only
+  prototypes/               self-contained, openable prototypes (see prototypes/README.md)
   misc/                     design brief and supporting notes
 ```
 
-> `archive/` holds superseded prototype copies (`prototype/`, `demo/`,
-> `prototype-journey-v2/`). They are **not** deployed and may drift from the live
-> app — only `public/index.html` is authoritative.
+> `prototypes/` holds self-contained offline prototypes (`demo/`, `prototype/`,
+> `prototype-journey-v2/`, `prototype-testcase-3/`) — each is a single
+> `index.html` you can open directly in any browser to explore a flow or idea.
+> They're exploratory builds, not the production client: only `public/index.html`
+> is authoritative.
 
 ## Why a proxy at all
 

@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>SunSide · Test Case 3 — Aubertstraße → Ferdinandshof</title>
+<style>
+  :root{
+    --bg:#f5f2ec; --ink:#1c1a17; --muted:#6b6358;
+    --sun:#f3a712; --sun-soft:#fbe3a3; --shade:#2f4858; --shade-soft:#bcd0d8;
+    --tram:#c8413a; --re:#e35205; --s2:#2a7a39; --bus:#8c4a9e;
+    --card:#ffffff; --line:#e4ddd0; --underground:#9a8f7e;
+    --r:18px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#d9d3c7;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+  body{display:flex;justify-content:center;padding:24px 12px;min-height:100vh}
+  .phone{width:390px;max-width:100%;background:var(--bg);border-radius:34px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.28);position:relative;min-height:780px;display:flex;flex-direction:column}
+  .notch{height:26px;display:flex;align-items:center;justify-content:center}
+  .notch::after{content:"";width:120px;height:6px;border-radius:6px;background:#c9c2b4}
+  header{padding:6px 20px 12px}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:-.3px;font-size:19px}
+  .brand .mark{width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 35%,var(--sun),#e08b00);box-shadow:0 0 0 4px var(--sun-soft)}
+  .brand .tc{margin-left:auto;font-size:11px;font-weight:600;color:var(--muted);background:#ece5d8;padding:4px 9px;border-radius:999px}
+  .screen{flex:1;overflow-y:auto;padding:0 16px 22px;-webkit-overflow-scrolling:touch}
+  .screen::-webkit-scrollbar{display:none}
+  .od{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:13px}
+  .od .row{display:flex;align-items:flex-start;gap:11px;font-size:14.5px;line-height:1.3}
+  .od .row+.row{margin-top:9px}
+  .dot{width:11px;height:11px;border-radius:50%;margin-top:3px;flex:0 0 auto}
+  .dot.o{background:var(--shade)} .dot.d{background:var(--tram)}
+  .od .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .od .nm{font-weight:600}
+  .meta{display:flex;gap:14px;margin-top:12px;padding-top:11px;border-top:1px dashed var(--line);font-size:12.5px;color:var(--muted)}
+  .meta b{color:var(--ink);font-weight:600}
+  .timebar{display:flex;gap:8px;margin-bottom:13px}
+  .timebar button{flex:1;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:9px 4px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;transition:.15s}
+  .timebar button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .verdict{background:linear-gradient(160deg,#22323d,#2f4858);color:#fff;border-radius:var(--r);padding:20px 18px;margin-bottom:13px;position:relative;overflow:hidden}
+  .verdict .eyebrow{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--shade-soft);font-weight:600}
+  .verdict .big{display:flex;align-items:center;gap:14px;margin:10px 0 6px}
+  .arrow{font-size:46px;line-height:1;filter:drop-shadow(0 2px 6px rgba(0,0,0,.3))}
+  .verdict .side{font-size:30px;font-weight:800;letter-spacing:-.5px}
+  .verdict .sub{font-size:13.5px;color:#dce6ea;line-height:1.4}
+  .conf{display:inline-flex;align-items:center;gap:6px;margin-top:12px;background:rgba(255,255,255,.12);padding:5px 11px;border-radius:999px;font-size:12px;font-weight:600}
+  .conf .pip{width:7px;height:7px;border-radius:50%}
+  .pip.hi{background:#7ee081} .pip.mix{background:var(--sun)}
+  .sunwed{position:absolute;right:-22px;top:-22px;width:96px;height:96px;border-radius:50%;background:radial-gradient(circle at 50% 50%,var(--sun),transparent 70%);opacity:.5}
+  .meter{display:flex;height:30px;border-radius:10px;overflow:hidden;margin:14px 0 4px;font-size:11px;font-weight:700}
+  .meter .seg{display:flex;align-items:center;justify-content:center;color:#fff;white-space:nowrap}
+  .meter .shadeseg{background:var(--shade)} .meter .sunseg{background:var(--sun);color:#5a3d00}
+  .meterlbl{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-weight:600}
+  .spine-title{font-size:12px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);font-weight:700;margin:18px 4px 10px;display:flex;justify-content:space-between}
+  .spine-title .hint{text-transform:none;letter-spacing:0;font-weight:600;color:#b3a994}
+  .spine{position:relative}
+  .leg{display:flex;gap:13px}
+  .rail{flex:0 0 auto;width:20px;display:flex;flex-direction:column;align-items:center}
+  .node{width:13px;height:13px;border-radius:50%;background:#fff;border:3px solid var(--shade);z-index:2;margin-top:3px}
+  .node.access{border-color:var(--underground)}
+  .node.now{border-color:var(--sun);box-shadow:0 0 0 5px var(--sun-soft);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 5px var(--sun-soft)}50%{box-shadow:0 0 0 9px rgba(243,167,18,.18)}}
+  .seg-line{width:4px;flex:1;border-radius:4px;min-height:30px;margin:1px 0}
+  .seg-line.shade-l{background:linear-gradient(90deg,var(--sun) 50%,var(--shade) 50%)}
+  .seg-line.shade-r{background:linear-gradient(90deg,var(--shade) 50%,var(--sun) 50%)}
+  .seg-line.access{background:repeating-linear-gradient(180deg,var(--underground),var(--underground) 5px,#d8cdbb 5px,#d8cdbb 10px)}
+  .legbody{flex:1;padding-bottom:14px;min-width:0}
+  .stopname{font-weight:650;font-size:14px;line-height:1.25}
+  .accesscard{margin-top:6px;background:#efe9dd;border:1px dashed var(--line);border-radius:12px;padding:9px 11px}
+  .accesscard .top{display:flex;align-items:center;gap:8px}
+  .seglabel{display:flex;align-items:center;gap:8px;margin-top:5px;font-size:12px;color:var(--muted)}
+  .seglabel .km{margin-left:auto;font-weight:600}
+  .seglabel .side{font-weight:800}
+  .seglabel.shade-l .side,.seglabel.shade-r .side{color:#b06a00}
+  .pill{font-size:10.5px;font-weight:700;color:#fff;padding:3px 8px;border-radius:999px;letter-spacing:.2px}
+  .pill.re{background:var(--re)} .pill.s{background:var(--s2)} .pill.bus{background:var(--bus)}
+  .accesscard .why{margin-top:4px;font-size:11px;color:var(--muted);line-height:1.35}
+  .followbtn{position:sticky;bottom:0;margin:8px -16px -22px;padding:14px 16px 22px;background:linear-gradient(180deg,transparent,var(--bg) 32%)}
+  .followbtn button{width:100%;border:none;background:var(--ink);color:#fff;font-size:15px;font-weight:700;padding:15px;border-radius:14px;cursor:pointer}
+  .jcard{background:linear-gradient(165deg,#1d2a33,#2f4858);color:#fff;border-radius:var(--r);padding:18px;margin-bottom:13px}
+  .jcard .src{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;background:rgba(255,255,255,.13);padding:4px 10px;border-radius:999px;color:#cfe0e6}
+  .jcard .ctx{font-size:12.5px;color:#aebfc6;margin:13px 0 4px;font-weight:600}
+  .jcard .leghead{font-size:16px;font-weight:700;line-height:1.3}
+  .jcard .jrec{font-size:23px;font-weight:800;margin-top:10px;display:flex;align-items:center;gap:11px}
+  .jcard .jrec .ar{font-size:29px}
+  .jbar{height:6px;background:rgba(255,255,255,.16);border-radius:6px;margin-top:15px;overflow:hidden}
+  .jbar i{display:block;height:100%;width:0;background:var(--sun);border-radius:6px;transition:width .5s linear}
+  .jctrl{display:flex;gap:10px;margin-bottom:14px}
+  .jctrl button{flex:1;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:12px;font-weight:700;font-size:14px;cursor:pointer}
+  .jctrl button.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .back{background:none;border:none;color:var(--muted);font-size:13px;font-weight:600;padding:6px 0 14px;cursor:pointer}
+  .arrived{background:var(--s2);color:#fff;text-align:center;padding:14px;border-radius:14px;font-weight:700;margin-bottom:13px;display:none}
+  .hidden{display:none}
+  .foot{font-size:11px;color:var(--muted);text-align:center;padding:14px 8px 4px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="notch"></div>
+  <header>
+    <div class="brand"><span class="mark"></span>SunSide<span class="tc">Test case 3</span></div>
+  </header>
+
+  <!-- RESULT -->
+  <div class="screen" id="screenResult">
+    <div class="od">
+      <div class="row"><span class="dot o"></span><div><div class="lbl">From</div><div class="nm">Aubertstraße 17, Berlin</div></div></div>
+      <div class="row"><span class="dot d"></span><div><div class="lbl">To</div><div class="nm">Ferdinandshof Bahnhof</div></div></div>
+      <div class="meta"><span><b>Bus 154</b> → <b>S2</b> → <b>RE3</b></span><span>1 long leg · <b>14 stops</b></span></div>
+    </div>
+
+    <div class="timebar" id="timebar">
+      <button data-t="morning">Morning<br>08:00</button>
+      <button data-t="midday">Midday<br>13:00</button>
+      <button data-t="evening" class="on">Evening<br>17:30</button>
+    </div>
+
+    <div class="verdict">
+      <div class="sunwed"></div>
+      <div class="eyebrow">Where to sit on the RE3</div>
+      <div class="big"><span class="arrow" id="vArrow">→</span><span class="side" id="vSide">Sit right</span></div>
+      <div class="sub" id="vSub"></div>
+      <div class="conf"><span class="pip hi" id="vPip"></span><span id="vConf"></span></div>
+      <div class="meter" id="vMeter"></div>
+      <div class="meterlbl"><span>shade side</span><span>flips</span></div>
+    </div>
+
+    <div class="spine-title"><span>The journey</span><span class="hint">Gesundbrunnen → Ferdinandshof</span></div>
+    <div class="spine" id="spine"></div>
+
+    <div class="foot">
+      RE3 stop sequence and per-segment bearings are the real, verified values for this line.
+      The departure time, the bus/S-Bahn access legs, the inferred Gesundbrunnen interchange,
+      and live tracking are prototype stand-ins.
+    </div>
+
+    <div class="followbtn"><button onclick="goJourney()">▶ Follow the ride</button></div>
+  </div>
+
+  <!-- JOURNEY -->
+  <div class="screen hidden" id="screenJourney">
+    <button class="back" onclick="goResult()">‹ Back to plan</button>
+    <div class="arrived" id="arrived">You’ve arrived at Ferdinandshof Bahnhof 🌳</div>
+    <div class="jcard">
+      <span class="src" id="jSrc">◐ clock estimate</span>
+      <div class="ctx" id="jCtx"></div>
+      <div class="leghead" id="jLeg"></div>
+      <div class="jrec" id="jRec"></div>
+      <div class="jbar"><i id="jFill"></i></div>
+    </div>
+    <div class="jctrl">
+      <button class="primary" id="playBtn" onclick="togglePlay()">⏸ Pause</button>
+      <button onclick="restart()">↺ Restart</button>
+    </div>
+    <div class="spine-title"><span>Position on RE3</span></div>
+    <div class="spine" id="jSpine"></div>
+  </div>
+</div>
+
+<script>
+const ROUTE = {"origin": {"name": "Aubertstraße 17", "lat": 52.60924, "lon": 13.41753}, "dest": {"name": "Ferdinandshof Bahnhof", "lat": 53.66011, "lon": 13.8821}, "access": [{"from": "Aubertstraße 17", "to": "S-Bahnhof (Pankow/Buch)", "line": "Bus 154", "cls": "bus", "mode": "surface-short"}, {"from": "S-Bahnhof", "to": "S+U Gesundbrunnen", "line": "S2", "cls": "s", "mode": "surface-mixed"}], "interchange": "S+U Gesundbrunnen", "re3line": "RE3 · toward Stralsund", "stops": [{"name": "S+U Gesundbrunnen", "lat": 52.5488, "lon": 13.3886}, {"name": "S Bernau", "lat": 52.674, "lon": 13.5918}, {"name": "Eberswalde Hbf", "lat": 52.8344, "lon": 13.8186}, {"name": "Britz", "lat": 52.8643, "lon": 13.8056}, {"name": "Chorin", "lat": 52.8956, "lon": 13.8846}, {"name": "Angermünde", "lat": 53.023, "lon": 13.999}, {"name": "Wilmersdorf (b. Ang.)", "lat": 53.1086, "lon": 13.9354}, {"name": "Warnitz", "lat": 53.1847, "lon": 13.9012}, {"name": "Seehausen (UM)", "lat": 53.2389, "lon": 13.8776}, {"name": "Prenzlau", "lat": 53.3157, "lon": 13.8612}, {"name": "Nechlin", "lat": 53.416, "lon": 13.929}, {"name": "Pasewalk", "lat": 53.5056, "lon": 13.9923}, {"name": "Jatznick", "lat": 53.5533, "lon": 13.9256}, {"name": "Ferdinandshof", "lat": 53.66011, "lon": 13.8821}], "segs": [{"from": "S+U Gesundbrunnen", "to": "S Bernau", "brg": 44.5, "km": 19.5, "lat": 52.6114, "lon": 13.4902}, {"from": "S Bernau", "to": "Eberswalde Hbf", "brg": 40.5, "km": 23.5, "lat": 52.7542, "lon": 13.7052}, {"from": "Eberswalde Hbf", "to": "Britz", "brg": 345.3, "km": 3.4, "lat": 52.84935, "lon": 13.812100000000001}, {"from": "Britz", "to": "Chorin", "brg": 56.7, "km": 6.3, "lat": 52.87995, "lon": 13.8451}, {"from": "Chorin", "to": "Angermünde", "brg": 28.4, "km": 16.1, "lat": 52.9593, "lon": 13.9418}, {"from": "Angermünde", "to": "Wilmersdorf (b. Ang.)", "brg": 336.0, "km": 10.4, "lat": 53.0658, "lon": 13.9672}, {"from": "Wilmersdorf (b. Ang.)", "to": "Warnitz", "brg": 344.9, "km": 8.8, "lat": 53.14665, "lon": 13.918299999999999}, {"from": "Warnitz", "to": "Seehausen (UM)", "brg": 345.4, "km": 6.2, "lat": 53.2118, "lon": 13.889399999999998}, {"from": "Seehausen (UM)", "to": "Prenzlau", "brg": 352.7, "km": 8.6, "lat": 53.2773, "lon": 13.869399999999999}, {"from": "Prenzlau", "to": "Nechlin", "brg": 21.9, "km": 12.0, "lat": 53.365849999999995, "lon": 13.8951}, {"from": "Nechlin", "to": "Pasewalk", "brg": 22.8, "km": 10.8, "lat": 53.4608, "lon": 13.960650000000001}, {"from": "Pasewalk", "to": "Jatznick", "brg": 320.3, "km": 6.9, "lat": 53.52945, "lon": 13.95895}, {"from": "Jatznick", "to": "Ferdinandshof", "brg": 346.4, "km": 12.2, "lat": 53.606705000000005, "lon": 13.903849999999998}]};
+
+/* inline NOAA-style sun position */
+const rad=d=>d*Math.PI/180, deg=r=>r*180/Math.PI;
+function sunPos(lat,lon,utcHours,doy){
+  const decl=-23.44*Math.cos(rad(360/365*(doy+10)));
+  const st=utcHours+lon/15, H=(st-12)*15;
+  const la=rad(lat),dr=rad(decl),Hr=rad(H);
+  const el=deg(Math.asin(Math.sin(la)*Math.sin(dr)+Math.cos(la)*Math.cos(dr)*Math.cos(Hr)));
+  let az=deg(Math.atan2(-Math.sin(Hr),Math.tan(dr)*Math.cos(la)-Math.sin(la)*Math.cos(Hr)));
+  return {az:(az+360)%360, el};
+}
+const TIMES={morning:6.0, midday:11.0, evening:15.5}; // local 08 / 13 / 17:30 summer
+const DOY=180;
+let CURRENT_TIME="evening";
+
+/* shade side for one RE3 segment */
+function shadeForSeg(seg,timeKey){
+  const s=sunPos(seg.lat,seg.lon,TIMES[timeKey],DOY);
+  if(s.el<3) return {relevant:false, el:s.el, reason:"sun is at/below the horizon — neither side has an edge."};
+  const rel=((s.az-seg.brg)%360+360)%360;
+  const sunRight = rel<180;
+  return {relevant:true, side: sunRight?"LEFT":"RIGHT", el:s.el, az:s.az,
+    reason:`bearing ${Math.round(seg.brg)}° · sun at ${Math.round(s.az)}° (${Math.round(s.el)}° up) → shade ${sunRight?"left":"right"}`};
+}
+
+function renderResult(){
+  document.querySelectorAll("#timebar button").forEach(b=>b.classList.toggle("on",b.dataset.t===CURRENT_TIME));
+  const spine=document.getElementById("spine"); spine.innerHTML="";
+
+  // verdict: km-weighted over RE3 segments
+  let tally={RIGHT:0,LEFT:0}, relKm=0, anyRelevant=false;
+  ROUTE.segs.forEach(sg=>{const r=shadeForSeg(sg,CURRENT_TIME); if(r.relevant){tally[r.side]+=sg.km;relKm+=sg.km;anyRelevant=true;}});
+  const winner = tally.RIGHT>=tally.LEFT?"RIGHT":"LEFT";
+  const winKm=tally[winner], loseKm=relKm-winKm;
+  const allSame = loseKm===0 && anyRelevant;
+
+  document.getElementById("vSide").textContent="Sit "+winner.toLowerCase();
+  document.getElementById("vArrow").textContent= winner==="RIGHT"?"→":"←";
+  const pip=document.getElementById("vPip");
+  if(!anyRelevant){
+    pip.className="pip mix";
+    document.getElementById("vConf").textContent="Sun too low — sit anywhere";
+    document.getElementById("vSub").textContent="At this hour the sun is barely above the horizon, so neither side holds a meaningful advantage.";
+  } else if(allSame){
+    pip.className="pip hi";
+    document.getElementById("vConf").textContent="High confidence · holds the whole way";
+    document.getElementById("vSub").textContent=`The sun stays on your ${winner==="RIGHT"?"left":"right"} for the entire RE3 run north, so the ${winner.toLowerCase()}-hand windows keep the shade.`;
+  } else {
+    pip.className="pip mix";
+    document.getElementById("vConf").textContent=`Mostly ${winner.toLowerCase()} · ${Math.round(winKm)} of ${Math.round(relKm)} km`;
+    document.getElementById("vSub").textContent=`The line curves between NE and NW, so the better side flips a few times. ${winner[0]+winner.slice(1).toLowerCase()} wins the most distance — the spine below marks where it switches.`;
+  }
+
+  const meter=document.getElementById("vMeter");
+  if(anyRelevant){
+    const sp=Math.round(winKm/relKm*100), op=100-sp;
+    meter.innerHTML=`<div class="seg shadeseg" style="width:${sp}%">${sp>16?sp+"%":""}</div>`+
+                    (op>0?`<div class="seg sunseg" style="width:${op}%">${op>16?op+"%":""}</div>`:"");
+  } else meter.innerHTML=`<div class="seg" style="width:100%;background:var(--underground)">no advantage now</div>`;
+
+  // access legs (suppressed)
+  ROUTE.access.forEach(a=>{
+    spine.insertAdjacentHTML("beforeend",
+      `<div class="leg">
+        <div class="rail"><div class="node access"></div><div class="seg-line access"></div></div>
+        <div class="legbody">
+          <div class="stopname">${a.from}</div>
+          <div class="accesscard">
+            <div class="top"><span class="pill ${a.cls}">${a.line}</span></div>
+            <div class="seglabel">⊘ no sun-side call here</div>
+            <div class="why">${a.mode==="surface-short"?"short local hop — too brief to matter":"city S-Bahn into Gesundbrunnen — built up, windows mostly blocked"}</div>
+          </div>
+        </div>
+      </div>`);
+  });
+
+  // RE3 spine: stops[i] with the segment leaving it
+  ROUTE.stops.forEach((st,i)=>{
+    const last=i===ROUTE.stops.length-1;
+    const seg = last? null : ROUTE.segs[i];
+    const r = seg? shadeForSeg(seg,CURRENT_TIME) : null;
+    let segCls="seg-line", segHtml="";
+    if(seg){
+      if(r.relevant) segCls+= r.side==="RIGHT"?" shade-r":" shade-l";
+      else segCls+=" access";
+    }
+    const sideTxt = seg? (r.relevant
+        ? `<div class="seglabel ${r.side==="RIGHT"?'shade-r':'shade-l'}"><span>shade <span class="side">${r.side}</span></span><span class="km">${seg.km} km</span></div>`
+        : `<div class="seglabel"><span>⊘ no call</span><span class="km">${seg.km} km</span></div>`)
+      : "";
+    const isFirst = i===0;
+    spine.insertAdjacentHTML("beforeend",
+      `<div class="leg">
+        <div class="rail"><div class="node ${isFirst?'':''}" style="${isFirst?'border-color:var(--re)':last?'border-color:var(--tram)':''}"></div>${last?"":`<div class="${segCls}"></div>`}</div>
+        <div class="legbody">
+          <div class="stopname">${st.name}${isFirst?' <span style="font-size:11px;color:var(--re);font-weight:700">· board RE3</span>':''}</div>
+          ${sideTxt}
+        </div>
+      </div>`);
+  });
+}
+
+document.getElementById("timebar").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  CURRENT_TIME=b.dataset.t; renderResult();
+});
+
+/* journey follow — over the RE3 segments */
+let jIdx=0, jTimer=null, jPlaying=false;
+const NSEG=()=>ROUTE.segs.length;
+function goJourney(){
+  document.getElementById("screenResult").classList.add("hidden");
+  document.getElementById("screenJourney").classList.remove("hidden");
+  jIdx=0; document.getElementById("arrived").style.display="none"; updateJourney(); startPlay();
+}
+function goResult(){ stopPlay();
+  document.getElementById("screenJourney").classList.add("hidden");
+  document.getElementById("screenResult").classList.remove("hidden"); }
+function renderJourneySpine(){
+  const sp=document.getElementById("jSpine"); sp.innerHTML="";
+  ROUTE.stops.forEach((st,i)=>{
+    const now=i===jIdx, passed=i<jIdx, last=i===ROUTE.stops.length-1;
+    sp.insertAdjacentHTML("beforeend",
+      `<div class="leg" style="opacity:${passed?.45:1}">
+        <div class="rail"><div class="node ${now?'now':''}"></div>${last?"":'<div class="seg-line" style="background:var(--shade)"></div>'}</div>
+        <div class="legbody"><div class="stopname">${st.name}</div>
+          ${now&&!last?`<div class="seglabel"><span>▶ riding now</span></div>`:""}
+        </div>
+      </div>`);
+  });
+}
+function updateJourney(){
+  const seg=ROUTE.segs[jIdx], r=shadeForSeg(seg,CURRENT_TIME);
+  document.getElementById("jCtx").textContent=`Segment ${jIdx+1} of ${NSEG()} · RE3 toward Stralsund`;
+  document.getElementById("jLeg").textContent=`${seg.from} → ${seg.to}`;
+  const rec=document.getElementById("jRec");
+  rec.innerHTML = r.relevant
+    ? `<span class="ar">${r.side==="RIGHT"?"→":"←"}</span><span>Shade ${r.side}</span>`
+    : `<span class="ar">⊘</span><span style="font-size:17px">No sun-side call</span>`;
+  document.getElementById("jSrc").textContent = jIdx>0 ? "📡 live GPS position" : "◐ clock estimate";
+  document.getElementById("jFill").style.width=((jIdx+1)/NSEG()*100)+"%";
+  renderJourneySpine();
+}
+function step(){
+  if(jIdx<NSEG()-1){ jIdx++; updateJourney(); }
+  else { stopPlay(); jIdx=ROUTE.stops.length-1; renderJourneySpine();
+    document.getElementById("arrived").style.display="block";
+    document.getElementById("jRec").innerHTML='<span class="ar">🌳</span><span>Anni’s stop</span>';
+    document.getElementById("jLeg").textContent="Ferdinandshof Bahnhof";
+    document.getElementById("jCtx").textContent="Journey complete"; }
+}
+function startPlay(){ jPlaying=true; document.getElementById("playBtn").textContent="⏸ Pause"; jTimer=setInterval(step,1600); }
+function stopPlay(){ jPlaying=false; document.getElementById("playBtn").textContent="▶ Play"; clearInterval(jTimer); }
+function togglePlay(){ jPlaying?stopPlay():startPlay(); }
+function restart(){ stopPlay(); jIdx=0; document.getElementById("arrived").style.display="none"; updateJourney(); startPlay(); }
+
+renderResult();
+</script>
+</body>
+</html>
