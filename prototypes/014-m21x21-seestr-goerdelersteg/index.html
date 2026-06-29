@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>SunSide · M21 — Wedding → Goerdelersteg</title>
+<style>
+  :root{
+    --bg:#f5f2ec; --ink:#1c1a17; --muted:#6b6358;
+    --sun:#f3a712; --sun-soft:#fbe3a3; --shade:#2f4858; --shade-soft:#bcd0d8;
+    --m21:#95276E; --m21-soft:#e7c6dd; --u6:#6d4aa3;
+    --card:#ffffff; --line:#e4ddd0; --underground:#9a8f7e;
+    --r:18px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#d9d3c7;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+  body{display:flex;justify-content:center;padding:24px 12px;min-height:100vh}
+  .phone{width:390px;max-width:100%;background:var(--bg);border-radius:34px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.28);position:relative;min-height:780px;display:flex;flex-direction:column}
+  .notch{height:26px;display:flex;align-items:center;justify-content:center}
+  .notch::after{content:"";width:120px;height:6px;border-radius:6px;background:#c9c2b4}
+  header{padding:6px 20px 12px}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:-.3px;font-size:19px}
+  .brand .mark{width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 35%,var(--sun),#e08b00);box-shadow:0 0 0 4px var(--sun-soft)}
+  .brand .tc{margin-left:auto;font-size:11px;font-weight:600;color:#fff;background:var(--m21);padding:4px 9px;border-radius:999px}
+  .screen{flex:1;overflow-y:auto;padding:0 16px 22px;-webkit-overflow-scrolling:touch}
+  .screen::-webkit-scrollbar{display:none}
+  .od{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:13px}
+  .od .row{display:flex;align-items:flex-start;gap:11px;font-size:14.5px;line-height:1.3}
+  .od .row+.row{margin-top:9px}
+  .dot{width:11px;height:11px;border-radius:50%;margin-top:3px;flex:0 0 auto}
+  .dot.o{background:var(--shade)} .dot.d{background:var(--m21)}
+  .od .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .od .nm{font-weight:600}
+  .meta{display:flex;gap:14px;margin-top:12px;padding-top:11px;border-top:1px dashed var(--line);font-size:12.5px;color:var(--muted)}
+  .meta b{color:var(--ink);font-weight:600}
+  .timebar{display:flex;gap:8px;margin-bottom:13px}
+  .timebar button{flex:1;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:9px 4px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;transition:.15s}
+  .timebar button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .verdict{background:linear-gradient(160deg,#22323d,#2f4858);color:#fff;border-radius:var(--r);padding:20px 18px;margin-bottom:13px;position:relative;overflow:hidden}
+  .verdict .eyebrow{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--shade-soft);font-weight:600}
+  .verdict .big{display:flex;align-items:center;gap:14px;margin:10px 0 6px}
+  .arrow{font-size:46px;line-height:1;filter:drop-shadow(0 2px 6px rgba(0,0,0,.3))}
+  .verdict .side{font-size:30px;font-weight:800;letter-spacing:-.5px}
+  .verdict .sub{font-size:13.5px;color:#dce6ea;line-height:1.4}
+  .conf{display:inline-flex;align-items:center;gap:6px;margin-top:12px;background:rgba(255,255,255,.12);padding:5px 11px;border-radius:999px;font-size:12px;font-weight:600}
+  .conf .pip{width:7px;height:7px;border-radius:50%}
+  .pip.hi{background:#7ee081} .pip.mix{background:var(--sun)}
+  .sunwed{position:absolute;right:-22px;top:-22px;width:96px;height:96px;border-radius:50%;background:radial-gradient(circle at 50% 50%,var(--sun),transparent 70%);opacity:.5}
+  .meter{display:flex;height:30px;border-radius:10px;overflow:hidden;margin:14px 0 4px;font-size:11px;font-weight:700}
+  .meter .seg{display:flex;align-items:center;justify-content:center;color:#fff;white-space:nowrap}
+  .meter .shadeseg{background:var(--shade)} .meter .sunseg{background:var(--sun);color:#5a3d00}
+  .meterlbl{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-weight:600}
+  .spine-title{font-size:12px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);font-weight:700;margin:18px 4px 10px;display:flex;justify-content:space-between}
+  .spine-title .hint{text-transform:none;letter-spacing:0;font-weight:600;color:#b3a994}
+  .spine{position:relative}
+  .leg{display:flex;gap:13px}
+  .rail{flex:0 0 auto;width:20px;display:flex;flex-direction:column;align-items:center}
+  .node{width:13px;height:13px;border-radius:50%;background:#fff;border:3px solid var(--shade);z-index:2;margin-top:3px}
+  .node.access{border-color:var(--underground)}
+  .node.now{border-color:var(--sun);box-shadow:0 0 0 5px var(--sun-soft);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 5px var(--sun-soft)}50%{box-shadow:0 0 0 9px rgba(243,167,18,.18)}}
+  .seg-line{width:4px;flex:1;border-radius:4px;min-height:30px;margin:1px 0}
+  .seg-line.shade-l{background:linear-gradient(90deg,var(--sun) 50%,var(--shade) 50%)}
+  .seg-line.shade-r{background:linear-gradient(90deg,var(--shade) 50%,var(--sun) 50%)}
+  .seg-line.access{background:repeating-linear-gradient(180deg,var(--underground),var(--underground) 5px,#d8cdbb 5px,#d8cdbb 10px)}
+  .legbody{flex:1;padding-bottom:14px;min-width:0}
+  .stopname{font-weight:650;font-size:14px;line-height:1.25}
+  .accesscard{margin-top:6px;background:#efe9dd;border:1px dashed var(--line);border-radius:12px;padding:9px 11px}
+  .accesscard .top{display:flex;align-items:center;gap:8px}
+  .seglabel{display:flex;align-items:center;gap:8px;margin-top:5px;font-size:12px;color:var(--muted)}
+  .seglabel .km{margin-left:auto;font-weight:600}
+  .seglabel .side{font-weight:800}
+  .seglabel.shade-l .side,.seglabel.shade-r .side{color:#b06a00}
+  .pill{font-size:10.5px;font-weight:700;color:#fff;padding:3px 8px;border-radius:999px;letter-spacing:.2px}
+  .pill.m21{background:var(--m21)} .pill.u{background:var(--u6)}
+  .accesscard .why{margin-top:4px;font-size:11px;color:var(--muted);line-height:1.35}
+  .followbtn{position:sticky;bottom:0;margin:8px -16px -22px;padding:14px 16px 22px;background:linear-gradient(180deg,transparent,var(--bg) 32%)}
+  .followbtn button{width:100%;border:none;background:var(--ink);color:#fff;font-size:15px;font-weight:700;padding:15px;border-radius:14px;cursor:pointer}
+  .jcard{background:linear-gradient(165deg,#1d2a33,#2f4858);color:#fff;border-radius:var(--r);padding:18px;margin-bottom:13px}
+  .jcard .src{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;background:rgba(255,255,255,.13);padding:4px 10px;border-radius:999px;color:#cfe0e6}
+  .jcard .ctx{font-size:12.5px;color:#aebfc6;margin:13px 0 4px;font-weight:600}
+  .jcard .leghead{font-size:16px;font-weight:700;line-height:1.3}
+  .jcard .jrec{font-size:23px;font-weight:800;margin-top:10px;display:flex;align-items:center;gap:11px}
+  .jcard .jrec .ar{font-size:29px}
+  .jbar{height:6px;background:rgba(255,255,255,.16);border-radius:6px;margin-top:15px;overflow:hidden}
+  .jbar i{display:block;height:100%;width:0;background:var(--sun);border-radius:6px;transition:width .5s linear}
+  .jctrl{display:flex;gap:10px;margin-bottom:14px}
+  .jctrl button{flex:1;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:12px;font-weight:700;font-size:14px;cursor:pointer}
+  .jctrl button.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .back{background:none;border:none;color:var(--muted);font-size:13px;font-weight:600;padding:6px 0 14px;cursor:pointer}
+  .arrived{background:var(--m21);color:#fff;text-align:center;padding:14px;border-radius:14px;font-weight:700;margin-bottom:13px;display:none}
+  .hidden{display:none}
+  .foot{font-size:11px;color:var(--muted);text-align:center;padding:14px 8px 4px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="notch"></div>
+  <header>
+    <div class="brand"><span class="mark"></span>SunSide<span class="tc">M21 / X21</span></div>
+  </header>
+
+  <!-- RESULT -->
+  <div class="screen" id="screenResult">
+    <div class="od">
+      <div class="row"><span class="dot o"></span><div><div class="lbl">From</div><div class="nm">Edinburger Straße 29, Wedding</div></div></div>
+      <div class="row"><span class="dot d"></span><div><div class="lbl">To</div><div class="nm">satis&amp;fy AG · Lise-Meitner-Str. 45</div></div></div>
+      <div class="meta"><span><b>M21 / X21</b> → Goerdelersteg</span><span>1 bus ride · <b>9 stops</b></span></div>
+    </div>
+
+    <div class="timebar" id="timebar">
+      <button data-t="morning">Morning<br>08:00</button>
+      <button data-t="midday">Midday<br>13:00</button>
+      <button data-t="evening" class="on">Evening<br>17:30</button>
+    </div>
+
+    <div class="verdict">
+      <div class="sunwed"></div>
+      <div class="eyebrow">Where to sit on the M21</div>
+      <div class="big"><span class="arrow" id="vArrow">→</span><span class="side" id="vSide">Sit right</span></div>
+      <div class="sub" id="vSub"></div>
+      <div class="conf"><span class="pip hi" id="vPip"></span><span id="vConf"></span></div>
+      <div class="meter" id="vMeter"></div>
+      <div class="meterlbl"><span>shade side</span><span>flips</span></div>
+    </div>
+
+    <div class="spine-title"><span>The ride</span><span class="hint">Kurt-Schumacher-Pl. → Goerdelersteg</span></div>
+    <div class="spine" id="spine"></div>
+
+    <div class="foot">
+      The M21 stop sequence and per-segment bearings are real, taken from OpenStreetMap
+      (BVG line M21 toward Goerdelersteg). The X21 runs the same Kurt-Schumacher-Platz →
+      Goerdelersteg corridor as an express. The U6 access leg from Wedding, the time of
+      day, and live tracking are prototype stand-ins.
+    </div>
+
+    <div class="followbtn"><button onclick="goJourney()">▶ Follow the ride</button></div>
+  </div>
+
+  <!-- JOURNEY -->
+  <div class="screen hidden" id="screenJourney">
+    <button class="back" onclick="goResult()">‹ Back to plan</button>
+    <div class="arrived" id="arrived">You’ve arrived at Goerdelersteg 🏢</div>
+    <div class="jcard">
+      <span class="src" id="jSrc">◐ clock estimate</span>
+      <div class="ctx" id="jCtx"></div>
+      <div class="leghead" id="jLeg"></div>
+      <div class="jrec" id="jRec"></div>
+      <div class="jbar"><i id="jFill"></i></div>
+    </div>
+    <div class="jctrl">
+      <button class="primary" id="playBtn" onclick="togglePlay()">⏸ Pause</button>
+      <button onclick="restart()">↺ Restart</button>
+    </div>
+    <div class="spine-title"><span>Position on the M21</span></div>
+    <div class="spine" id="jSpine"></div>
+  </div>
+</div>
+
+<script>
+const ROUTE = {"origin":{"name":"Edinburger Straße 29, Wedding","lat":52.5552,"lon":13.3493},"dest":{"name":"satis&fy AG · Lise-Meitner-Str. 45","lat":52.53365,"lon":13.30407},"access":[{"from":"Edinburger Straße 29","to":"U Kurt-Schumacher-Platz","line":"U6 + walk","cls":"u","mode":"feeder"}],"interchange":"U Kurt-Schumacher-Platz","mainline":"M21 · toward Goerdelersteg","stops":[{"name":"U Kurt-Schumacher-Platz","lat":52.56335,"lon":13.32698},{"name":"Julius-Leber-Kaserne","lat":52.5613,"lon":13.32542},{"name":"Kaserne Nordtor","lat":52.5599,"lon":13.31709},{"name":"Aristide-Briand-Brücke","lat":52.55529,"lon":13.30668},{"name":"Hinckeldeybrücke","lat":52.54659,"lon":13.29929},{"name":"Weltlingerbrücke","lat":52.53905,"lon":13.29459},{"name":"U Jakob-Kaiser-Platz","lat":52.5367,"lon":13.29311},{"name":"S+U Jungfernheide","lat":52.53089,"lon":13.29943},{"name":"Goerdelersteg","lat":52.53384,"lon":13.30564}],"segs":[{"from":"U Kurt-Schumacher-Platz","to":"Julius-Leber-Kaserne","brg":204.8,"km":0.25,"lat":52.56233,"lon":13.3262},{"from":"Julius-Leber-Kaserne","to":"Kaserne Nordtor","brg":254.5,"km":0.58,"lat":52.5606,"lon":13.32126},{"from":"Kaserne Nordtor","to":"Aristide-Briand-Brücke","brg":233.9,"km":0.87,"lat":52.55759,"lon":13.31189},{"from":"Aristide-Briand-Brücke","to":"Hinckeldeybrücke","brg":207.3,"km":1.09,"lat":52.55094,"lon":13.30298},{"from":"Hinckeldeybrücke","to":"Weltlingerbrücke","brg":200.8,"km":0.9,"lat":52.54282,"lon":13.29694},{"from":"Weltlingerbrücke","to":"U Jakob-Kaiser-Platz","brg":201.0,"km":0.28,"lat":52.53787,"lon":13.29385},{"from":"U Jakob-Kaiser-Platz","to":"S+U Jungfernheide","brg":146.5,"km":0.77,"lat":52.53379,"lon":13.29627},{"from":"S+U Jungfernheide","to":"Goerdelersteg","brg":52.0,"km":0.53,"lat":52.53236,"lon":13.30253}]};
+
+/* inline NOAA-style sun position */
+const rad=d=>d*Math.PI/180, deg=r=>r*180/Math.PI;
+function sunPos(lat,lon,utcHours,doy){
+  const decl=-23.44*Math.cos(rad(360/365*(doy+10)));
+  const st=utcHours+lon/15, H=(st-12)*15;
+  const la=rad(lat),dr=rad(decl),Hr=rad(H);
+  const el=deg(Math.asin(Math.sin(la)*Math.sin(dr)+Math.cos(la)*Math.cos(dr)*Math.cos(Hr)));
+  let az=deg(Math.atan2(-Math.sin(Hr),Math.tan(dr)*Math.cos(la)-Math.sin(la)*Math.cos(Hr)));
+  return {az:(az+360)%360, el};
+}
+const TIMES={morning:6.0, midday:11.0, evening:15.5}; // local 08 / 13 / 17:30 summer
+const DOY=180;
+let CURRENT_TIME="evening";
+
+/* shade side for one M21 segment */
+function shadeForSeg(seg,timeKey){
+  const s=sunPos(seg.lat,seg.lon,TIMES[timeKey],DOY);
+  if(s.el<3) return {relevant:false, el:s.el, reason:"sun is at/below the horizon — neither side has an edge."};
+  const rel=((s.az-seg.brg)%360+360)%360;
+  const sunRight = rel<180;
+  return {relevant:true, side: sunRight?"LEFT":"RIGHT", el:s.el, az:s.az,
+    reason:`bearing ${Math.round(seg.brg)}° · sun at ${Math.round(s.az)}° (${Math.round(s.el)}° up) → shade ${sunRight?"left":"right"}`};
+}
+
+function renderResult(){
+  document.querySelectorAll("#timebar button").forEach(b=>b.classList.toggle("on",b.dataset.t===CURRENT_TIME));
+  const spine=document.getElementById("spine"); spine.innerHTML="";
+
+  // verdict: km-weighted over M21 segments
+  let tally={RIGHT:0,LEFT:0}, relKm=0, anyRelevant=false;
+  ROUTE.segs.forEach(sg=>{const r=shadeForSeg(sg,CURRENT_TIME); if(r.relevant){tally[r.side]+=sg.km;relKm+=sg.km;anyRelevant=true;}});
+  const winner = tally.RIGHT>=tally.LEFT?"RIGHT":"LEFT";
+  const winKm=tally[winner], loseKm=relKm-winKm;
+  const allSame = loseKm===0 && anyRelevant;
+
+  document.getElementById("vSide").textContent="Sit "+winner.toLowerCase();
+  document.getElementById("vArrow").textContent= winner==="RIGHT"?"→":"←";
+  const pip=document.getElementById("vPip");
+  if(!anyRelevant){
+    pip.className="pip mix";
+    document.getElementById("vConf").textContent="Sun too low — sit anywhere";
+    document.getElementById("vSub").textContent="At this hour the sun is barely above the horizon, so neither side holds a meaningful advantage.";
+  } else if(allSame){
+    pip.className="pip hi";
+    document.getElementById("vConf").textContent="High confidence · holds the whole way";
+    document.getElementById("vSub").textContent=`The sun stays on your ${winner==="RIGHT"?"left":"right"} for the whole M21 run, so the ${winner.toLowerCase()}-hand windows keep the shade.`;
+  } else {
+    pip.className="pip mix";
+    document.getElementById("vConf").textContent=`Mostly ${winner.toLowerCase()} · ${Math.round(winKm*10)/10} of ${Math.round(relKm*10)/10} km`;
+    document.getElementById("vSub").textContent=`The bus heads southwest down the canal, then hooks northeast to Goerdelersteg — so the shaded side flips near the end. ${winner[0]+winner.slice(1).toLowerCase()} wins the most distance; the spine below marks the switch.`;
+  }
+
+  const meter=document.getElementById("vMeter");
+  if(anyRelevant){
+    const sp=Math.round(winKm/relKm*100), op=100-sp;
+    meter.innerHTML=`<div class="seg shadeseg" style="width:${sp}%">${sp>16?sp+"%":""}</div>`+
+                    (op>0?`<div class="seg sunseg" style="width:${op}%">${op>16?op+"%":""}</div>`:"");
+  } else meter.innerHTML=`<div class="seg" style="width:100%;background:var(--underground)">no advantage now</div>`;
+
+  // access legs (no sun-side call)
+  ROUTE.access.forEach(a=>{
+    spine.insertAdjacentHTML("beforeend",
+      `<div class="leg">
+        <div class="rail"><div class="node access"></div><div class="seg-line access"></div></div>
+        <div class="legbody">
+          <div class="stopname">${a.from}</div>
+          <div class="accesscard">
+            <div class="top"><span class="pill ${a.cls}">${a.line}</span></div>
+            <div class="seglabel">⊘ no sun-side call here</div>
+            <div class="why">U6 from Wedding, then a short walk to the stop — underground, so there are no windows and no sun side to choose.</div>
+          </div>
+        </div>
+      </div>`);
+  });
+
+  // M21 spine: stops[i] with the segment leaving it
+  ROUTE.stops.forEach((st,i)=>{
+    const last=i===ROUTE.stops.length-1;
+    const seg = last? null : ROUTE.segs[i];
+    const r = seg? shadeForSeg(seg,CURRENT_TIME) : null;
+    let segCls="seg-line", segHtml="";
+    if(seg){
+      if(r.relevant) segCls+= r.side==="RIGHT"?" shade-r":" shade-l";
+      else segCls+=" access";
+    }
+    const sideTxt = seg? (r.relevant
+        ? `<div class="seglabel ${r.side==="RIGHT"?'shade-r':'shade-l'}"><span>shade <span class="side">${r.side}</span></span><span class="km">${seg.km} km</span></div>`
+        : `<div class="seglabel"><span>⊘ no call</span><span class="km">${seg.km} km</span></div>`)
+      : "";
+    const isFirst = i===0;
+    spine.insertAdjacentHTML("beforeend",
+      `<div class="leg">
+        <div class="rail"><div class="node" style="${isFirst?'border-color:var(--m21)':last?'border-color:var(--m21)':''}"></div>${last?"":`<div class="${segCls}"></div>`}</div>
+        <div class="legbody">
+          <div class="stopname">${st.name}${isFirst?' <span style="font-size:11px;color:var(--m21);font-weight:700">· board M21</span>':''}${last?' <span style="font-size:11px;color:var(--m21);font-weight:700">· get off</span>':''}</div>
+          ${sideTxt}
+        </div>
+      </div>`);
+  });
+}
+
+document.getElementById("timebar").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  CURRENT_TIME=b.dataset.t; renderResult();
+});
+
+/* journey follow — over the M21 segments */
+let jIdx=0, jTimer=null, jPlaying=false;
+const NSEG=()=>ROUTE.segs.length;
+function goJourney(){
+  document.getElementById("screenResult").classList.add("hidden");
+  document.getElementById("screenJourney").classList.remove("hidden");
+  jIdx=0; document.getElementById("arrived").style.display="none"; updateJourney(); startPlay();
+}
+function goResult(){ stopPlay();
+  document.getElementById("screenJourney").classList.add("hidden");
+  document.getElementById("screenResult").classList.remove("hidden"); }
+function renderJourneySpine(){
+  const sp=document.getElementById("jSpine"); sp.innerHTML="";
+  ROUTE.stops.forEach((st,i)=>{
+    const now=i===jIdx, passed=i<jIdx, last=i===ROUTE.stops.length-1;
+    sp.insertAdjacentHTML("beforeend",
+      `<div class="leg" style="opacity:${passed?.45:1}">
+        <div class="rail"><div class="node ${now?'now':''}"></div>${last?"":'<div class="seg-line" style="background:var(--shade)"></div>'}</div>
+        <div class="legbody"><div class="stopname">${st.name}</div>
+          ${now&&!last?`<div class="seglabel"><span>▶ riding now</span></div>`:""}
+        </div>
+      </div>`);
+  });
+}
+function updateJourney(){
+  const seg=ROUTE.segs[jIdx], r=shadeForSeg(seg,CURRENT_TIME);
+  document.getElementById("jCtx").textContent=`Segment ${jIdx+1} of ${NSEG()} · M21 toward Goerdelersteg`;
+  document.getElementById("jLeg").textContent=`${seg.from} → ${seg.to}`;
+  const rec=document.getElementById("jRec");
+  rec.innerHTML = r.relevant
+    ? `<span class="ar">${r.side==="RIGHT"?"→":"←"}</span><span>Shade ${r.side}</span>`
+    : `<span class="ar">⊘</span><span style="font-size:17px">No sun-side call</span>`;
+  document.getElementById("jSrc").textContent = jIdx>0 ? "📡 live GPS position" : "◐ clock estimate";
+  document.getElementById("jFill").style.width=((jIdx+1)/NSEG()*100)+"%";
+  renderJourneySpine();
+}
+function step(){
+  if(jIdx<NSEG()-1){ jIdx++; updateJourney(); }
+  else { stopPlay(); jIdx=ROUTE.stops.length-1; renderJourneySpine();
+    document.getElementById("arrived").style.display="block";
+    document.getElementById("jRec").innerHTML='<span class="ar">🏢</span><span>satis&amp;fy AG</span>';
+    document.getElementById("jLeg").textContent="Goerdelersteg";
+    document.getElementById("jCtx").textContent="Journey complete"; }
+}
+function startPlay(){ jPlaying=true; document.getElementById("playBtn").textContent="⏸ Pause"; jTimer=setInterval(step,1600); }
+function stopPlay(){ jPlaying=false; document.getElementById("playBtn").textContent="▶ Play"; clearInterval(jTimer); }
+function togglePlay(){ jPlaying?stopPlay():startPlay(); }
+function restart(){ stopPlay(); jIdx=0; document.getElementById("arrived").style.display="none"; updateJourney(); startPlay(); }
+
+renderResult();
+</script>
+</body>
+</html>

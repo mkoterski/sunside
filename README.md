@@ -19,9 +19,10 @@ sunside/
   misc/                     design brief and supporting notes
 ```
 
-> `prototypes/` holds self-contained offline prototypes (`demo/`, `prototype/`,
-> `prototype-journey-v2/`, `prototype-testcase-3/`) — each is a single
-> `index.html` you can open directly in any browser to explore a flow or idea.
+> `prototypes/` holds self-contained offline prototypes, one numbered folder each
+> (`010-tram50-hugenottenpl-seestr-demo/` and so on; see `prototypes/README.md`) —
+> each is a single `index.html` you can open directly in any browser to explore a
+> flow or idea.
 > They're exploratory builds, not the production client: only `public/index.html`
 > is authoritative.
 
