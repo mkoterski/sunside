@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SunSide · feature-integration mockups</title>
+<style>
+  :root{
+    --sun:#F4A024; --sun-soft:#FBD9A0;
+    --shade:#2B3A55; --shade-soft:#9FB0C9;
+    --paper:#FBF7EF; --card:#fff; --ink:#1C232E; --slate:#6B7280;
+    --tram:#D6492F; --line:#E4DDCE; --neutral:#C9C2B2;
+    --bus:#6b4ea0; --ubahn:#1f6fb2; --sbahn:#2e8b57;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:#E4DBC9; color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    line-height:1.5; padding:2.5rem 1.25rem 4rem;
+  }
+  .doc-head{max-width:1180px;margin:0 auto 2.4rem}
+  .doc-head .wm{font-family:"Helvetica Neue",Arial,sans-serif;font-weight:800;font-size:1.6rem;letter-spacing:-.02em;text-transform:uppercase}
+  .doc-head .wm .s{color:var(--sun)}
+  .doc-head h2{font-family:"Helvetica Neue",Arial,sans-serif;font-weight:800;font-size:1.7rem;letter-spacing:-.02em;margin:.5rem 0 .6rem;max-width:30ch}
+  .doc-head p{font-size:.92rem;color:#4a5260;max-width:70ch}
+  .legend{display:flex;flex-wrap:wrap;gap:.5rem .7rem;margin-top:1.1rem}
+  .legend .tag{font-size:.66rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:#fff;border:1px solid var(--line);border-radius:999px;padding:.3rem .65rem;color:#4a5260}
+  .legend .tag b{color:var(--ink)}
+
+  .grid{display:flex;flex-wrap:wrap;gap:2.4rem 1.8rem;justify-content:center;align-items:flex-start;max-width:1180px;margin:0 auto}
+  .col{width:380px;max-width:100%}
+  .caption{margin-bottom:.85rem}
+  .caption .step{font-family:ui-monospace,monospace;font-size:.66rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--slate)}
+  .caption h3{font-family:"Helvetica Neue",Arial,sans-serif;font-weight:800;font-size:1.05rem;letter-spacing:-.01em;margin:.15rem 0 .3rem}
+  .caption .new{display:inline-block;font-size:.6rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;background:var(--sun);color:var(--ink);border-radius:5px;padding:.12rem .4rem;margin-right:.35rem}
+  .caption .src{font-size:.74rem;color:#4a5260}
+
+  /* phone frame — from prototypes */
+  .phone{
+    width:100%;max-width:380px;background:var(--paper);
+    border-radius:34px;box-shadow:0 24px 60px rgba(0,0,0,.22), 0 0 0 9px #111;
+    overflow:hidden;position:relative;display:flex;flex-direction:column;min-height:720px;
+  }
+  .notch{height:24px;background:#111;border-radius:0 0 16px 16px;width:130px;margin:0 auto;flex:none}
+  .pad{padding:1.1rem 1.15rem 1.4rem}
+  .top{display:flex;align-items:center;gap:.6rem;padding:.9rem 1.15rem .2rem}
+  .top .back{border:0;background:none;font:inherit;color:var(--slate);font-size:1.3rem;line-height:1;padding:.1rem .2rem}
+  .brand{display:flex;align-items:baseline;gap:.4rem}
+  .brand h1{font-family:"Helvetica Neue",Arial,sans-serif;font-weight:800;font-size:1.1rem;letter-spacing:-.02em;text-transform:uppercase}
+  .brand h1 .s{color:var(--sun)}
+  .brand .tag{font-size:.58rem;letter-spacing:.13em;text-transform:uppercase;color:var(--slate);font-weight:700}
+
+  .route{display:flex;align-items:center;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+  .route .pill{font-size:.7rem;font-weight:700;color:#fff;background:var(--tram);border-radius:6px;padding:.18rem .5rem;letter-spacing:.02em}
+  .route .rt{font-size:.84rem;font-weight:600}
+  .route .pill.lb{background:var(--bus)} .route .pill.lu{background:var(--ubahn)} .route .pill.ls{background:var(--sbahn)}
+
+  /* verdict card */
+  .verdict{border:1.5px solid var(--ink);border-radius:14px;overflow:hidden;margin-bottom:1.1rem;background:#fff}
+  .verdict .head{padding:1rem 1.1rem .85rem}
+  .vhead-row{display:flex;align-items:flex-start;justify-content:space-between;gap:.6rem}
+  .eyebrow{font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:var(--slate);font-weight:700;margin-bottom:.4rem}
+  .big{font-family:"Helvetica Neue",Arial,sans-serif;font-weight:800;font-size:1.55rem;letter-spacing:-.02em;line-height:1.05;display:flex;align-items:center;gap:.55rem}
+  .big .dir{color:var(--tram)}
+  .dir-arrow{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;flex:none;border-radius:11px;background:var(--tram);color:#fff}
+  .dir-arrow.point-right{transform:scaleX(-1)}
+  .why{font-size:.8rem;color:var(--slate);margin-top:.55rem;max-width:40ch}
+
+  /* NEW — confidence chip (Sunseat) */
+  .conf{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:.25rem}
+  .conf .ring{position:relative;width:50px;height:50px}
+  .conf .ring svg{transform:rotate(-90deg)}
+  .conf .ring .pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-size:.72rem;font-weight:700}
+  .conf .lbl{font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--slate);font-weight:700}
+
+  /* shade meter + NEW per-side % */
+  .meter{display:flex;height:30px;font-size:.66rem;font-weight:700;color:#fff}
+  .meter span{display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .m-right{background:var(--shade)} .m-left{background:var(--sun);color:var(--ink)} .m-neutral{background:var(--neutral);color:var(--ink)}
+  .meter-key{display:flex;gap:.9rem;font-size:.66rem;color:var(--slate);padding:.5rem 1.1rem;border-top:1px solid var(--line);flex-wrap:wrap}
+  .meter-key b{color:var(--ink);font-family:ui-monospace,monospace}
+  .meter-key .pctv{color:var(--ink);font-weight:700}
+
+  /* NEW — return-trip toggle (ShadeSide) */
+  .leg-toggle{display:flex;border:1.5px solid var(--ink);border-radius:10px;overflow:hidden;margin-bottom:1rem}
+  .leg-toggle button{flex:1;border:0;background:#fff;font:inherit;font-size:.76rem;font-weight:700;color:var(--ink);padding:.5rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.35rem}
+  .leg-toggle button[aria-pressed=true]{background:var(--ink);color:#fff}
+  .leg-toggle button .sub{font-family:ui-monospace,monospace;font-size:.62rem;font-weight:600;opacity:.7}
+
+  /* NEW — best-departure finder (ShadeSide) */
+  .dep{background:#fff;border:1px solid var(--line);border-radius:13px;padding:.95rem 1rem 1.05rem;margin-bottom:1.1rem}
+  .dep-title{font-size:.62rem;letter-spacing:.13em;text-transform:uppercase;color:var(--slate);font-weight:700;margin-bottom:.2rem}
+  .dep-lead{font-size:.82rem;font-weight:600;margin-bottom:.85rem}
+  .dep-lead b{color:var(--tram)}
+  .deps{display:grid;gap:.5rem}
+  .dep-opt{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.7rem;border:1.5px solid var(--line);border-radius:10px;padding:.55rem .7rem;cursor:pointer}
+  .dep-opt[aria-selected=true]{border-color:var(--ink);background:#FFFCF6}
+  .dep-opt .dt{font-family:ui-monospace,monospace;font-size:.82rem;font-weight:700;white-space:nowrap}
+  .dep-opt .dt .in{display:block;font-size:.58rem;font-weight:600;color:var(--slate);letter-spacing:.02em}
+  .dep-bar{height:9px;border-radius:5px;background:var(--line);position:relative;overflow:hidden}
+  .dep-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px}
+  .dep-bar i.good{background:var(--shade)} .dep-bar i.mid{background:var(--sun)} .dep-bar i.bad{background:var(--tram)}
+  .dep-verd{font-family:ui-monospace,monospace;font-size:.66rem;font-weight:700;white-space:nowrap;text-align:right;min-width:62px}
+  .dep-verd.left{color:var(--sun)} .dep-verd.right{color:var(--shade)} .dep-verd.even{color:var(--slate)}
+  .dep-foot{font-size:.66rem;color:var(--slate);margin-top:.7rem;line-height:1.5}
+
+  /* spine — from prototypes */
+  .spine-title{font-size:.62rem;letter-spacing:.13em;text-transform:uppercase;color:var(--slate);font-weight:700;margin:.2rem 0 .7rem;display:flex;justify-content:space-between;align-items:center}
+  .map-btn{border:1.5px solid var(--ink);background:#fff;font:inherit;font-size:.66rem;font-weight:700;border-radius:8px;padding:.25rem .55rem;letter-spacing:.02em;text-transform:none}
+  .map-btn[aria-pressed=true]{background:var(--ink);color:#fff}
+  .spine{position:relative}
+  .seg{display:grid;grid-template-columns:16px 1fr auto;gap:.6rem;align-items:start}
+  .seg .rail{position:relative;display:flex;justify-content:center}
+  .seg .rail::before{content:"";position:absolute;top:0;bottom:0;width:4px;background:var(--neutral)}
+  .seg.s-right .rail::before{background:var(--shade)}
+  .seg.s-left .rail::before{background:var(--sun)}
+  .seg .dot{width:10px;height:10px;border-radius:50%;background:#fff;border:2.5px solid var(--ink);margin-top:2px;z-index:1}
+  .seg.boarding .dot{background:var(--tram);border-color:var(--tram);width:13px;height:13px}
+  .seg.exit .dot{background:var(--ink)}
+  .seg.current .dot{background:var(--sun);border-color:var(--tram);box-shadow:0 0 0 4px rgba(244,160,36,.35)}
+  .seg .body{padding-bottom:.85rem;min-width:0}
+  .seg .stop{font-size:.82rem;font-weight:600;margin-right:.4rem}
+  .seg.current .stop{color:var(--tram)}
+  .seg .leg{font-family:ui-monospace,monospace;font-size:.62rem;color:var(--slate);margin-top:.1rem}
+  .flag{display:inline-block;font-size:.55rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:.05rem .3rem;border-radius:4px;margin-left:.35rem;vertical-align:middle}
+  .f-board{background:var(--tram);color:#fff} .f-exit{background:var(--ink);color:#fff} .f-flip{background:var(--sun);color:var(--ink)} .f-now{background:var(--sun);color:var(--ink)} .f-under{background:var(--neutral);color:var(--ink)}
+  .seg .side{font-family:ui-monospace,monospace;font-size:.6rem;font-weight:700;text-align:right;white-space:nowrap;padding-top:1px}
+  .side.right{color:var(--shade)} .side.left{color:var(--sun)} .side.neutral{color:var(--slate)}
+
+  /* NEW — three-state map (Sit In Shade) */
+  .map{border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-bottom:.9rem;background:#EFE7D7}
+  .map svg{display:block;width:100%;height:auto}
+  .map-key{display:flex;gap:.9rem;flex-wrap:wrap;font-size:.62rem;color:var(--slate);padding:.55rem .9rem;border-top:1px solid var(--line);background:#fff}
+  .map-key span{display:flex;align-items:center;gap:.32rem}
+  .map-key i{width:14px;height:6px;border-radius:3px;display:inline-block}
+  .map-key i.l{background:var(--sun)} .map-key i.r{background:var(--shade)} .map-key i.n{background:var(--neutral)}
+
+  /* journey status — from prototypes */
+  .journey-status{background:var(--ink);color:#fff;border-radius:14px;padding:1rem 1.1rem;margin-bottom:1rem}
+  .journey-status .now-seg{font-size:.64rem;letter-spacing:.13em;text-transform:uppercase;color:var(--sun);font-weight:700}
+  .journey-status .now-stops{font-size:1.02rem;font-weight:700;margin-top:.3rem;line-height:1.25}
+  .journey-status .now-side{font-size:.8rem;margin-top:.5rem;color:var(--shade-soft)}
+  .journey-status .now-side b{color:#fff}
+  .js-controls{display:flex;align-items:center;gap:.7rem;margin-top:.8rem}
+  .play{width:38px;height:38px;border-radius:50%;background:var(--sun);border:0;color:var(--ink);display:flex;align-items:center;justify-content:center;flex:none}
+  .src-badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.58rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;background:rgba(255,255,255,.15);padding:.2rem .45rem;border-radius:5px}
+  .progress{height:6px;background:rgba(255,255,255,.2);border-radius:4px;margin-top:.7rem;overflow:hidden}
+  .progress .fill{height:100%;background:var(--sun);width:46%}
+
+  .underband{display:flex;align-items:center;gap:.55rem;background:#F3EEE3;border:1px dashed var(--neutral);border-radius:11px;padding:.7rem .85rem;margin-bottom:.7rem;font-size:.76rem;color:#4a5260}
+  .underband b{color:var(--ink)}
+  .underband .ic{flex:none}
+
+  .foot{margin-top:.4rem;font-size:.64rem;color:var(--slate);line-height:1.55;border-top:1px solid var(--line);padding-top:.8rem}
+  .foot b{color:var(--ink)}
+
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="doc-head">
+  <div class="wm">Sun<span class="s">Side</span></div>
+  <h2>Competitor features, folded into the SunSide design system</h2>
+  <p>Four mockups that take the verified, useful features from ShadeSide, Sunseat and Sit In Shade and
+  rebuild them with SunSide's own tokens, voice and the route-spine semantics from the design brief —
+  rather than bolting on a foreign UI. Each screen extends an existing prototype component. The amber =
+  sun-hits / indigo = shade / grey = no-clear-side mapping holds everywhere.</p>
+  <div class="legend">
+    <span class="tag"><b>Confidence ring</b> · Sunseat</span>
+    <span class="tag"><b>Per-side %</b> · Sunny Side / Sit In Shade</span>
+    <span class="tag"><b>Best-departure finder</b> · ShadeSide</span>
+    <span class="tag"><b>Return-trip toggle</b> · ShadeSide</span>
+    <span class="tag"><b>Three-state route map</b> · Sit In Shade</span>
+  </div>
+</div>
+
+<div class="grid">
+
+  <!-- ───────── SCREEN A: result with confidence + % + return toggle ───────── -->
+  <div class="col">
+    <div class="caption">
+      <span class="step">Screen 3 · where to sit</span>
+      <h3>Verdict card, now with confidence + per-side %</h3>
+      <p class="src"><span class="new">new</span>Confidence ring (Sunseat) and a per-side percentage beside the existing shaded-km. SunSide can claim higher confidence than straight-line apps because it scores real per-segment geometry.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="top">
+        <button class="back">‹</button>
+        <div class="brand"><h1>Sun<span class="s">Side</span></h1><span class="tag">prototype</span></div>
+      </div>
+      <div class="pad">
+        <div class="route">
+          <span class="pill">Tram 50</span>
+          <span class="rt">Hugenottenplatz → U Seestraße</span>
+        </div>
+
+        <!-- return-trip toggle -->
+        <div class="leg-toggle">
+          <button aria-pressed="true">Outbound <span class="sub">now · 14:45</span></button>
+          <button aria-pressed="false">Return <span class="sub">~17:20</span></button>
+        </div>
+
+        <div class="verdict">
+          <div class="head">
+            <div class="vhead-row">
+              <div>
+                <div class="eyebrow">Where to sit</div>
+                <div class="big">
+                  <span class="dir-arrow" aria-hidden="true">
+                    <svg viewBox="0 0 40 32" width="38" height="30"><path d="M22 4 L6 16 L22 28 M6 16 H36" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </span>
+                  <span>Sit on the <span class="dir">left</span></span>
+                </div>
+              </div>
+              <!-- confidence ring -->
+              <div class="conf">
+                <div class="ring">
+                  <svg width="50" height="50" viewBox="0 0 50 50">
+                    <circle cx="25" cy="25" r="20" fill="none" stroke="#E4DDCE" stroke-width="6"/>
+                    <circle cx="25" cy="25" r="20" fill="none" stroke="#2B3A55" stroke-width="6" stroke-linecap="round" stroke-dasharray="125.6" stroke-dashoffset="22.6"/>
+                  </svg>
+                  <span class="pct">82%</span>
+                </div>
+                <span class="lbl">Confidence</span>
+              </div>
+            </div>
+            <div class="why">Most of the ride runs east–west under a southern sun, so the left stays shaded. One short northward leg flips — flagged below.</div>
+          </div>
+          <div class="meter">
+            <span class="m-left" style="flex-basis:64%">left shaded</span>
+            <span class="m-neutral" style="flex-basis:14%"></span>
+            <span class="m-right" style="flex-basis:22%">right</span>
+          </div>
+          <div class="meter-key">
+            <span><span class="pctv">64%</span> · <b>5.1 km</b> left shaded</span>
+            <span><span class="pctv">22%</span> · <b>1.8 km</b> right</span>
+            <span><span class="pctv">14%</span> · <b>1.1 km</b> even</span>
+          </div>
+        </div>
+
+        <div class="spine-title">Stop by stop · 8 of 28 segments</div>
+        <div class="spine">
+          <div class="seg boarding s-left">
+            <div class="rail"><span class="dot"></span></div>
+            <div class="body"><span class="stop">Hugenottenplatz <span class="flag f-board">board</span></span><span class="leg">268° W · 0.39 km</span></div>
+            <div class="side left">← shade</div>
+          </div>
+          <div class="seg s-left">
+            <div class="rail"><span class="dot"></span></div>
+            <div class="body"><span class="stop">Rolandstraße</span><span class="leg">271° W · 0.44 km</span></div>
+            <div class="side left">← shade</div>
+          </div>
+          <div class="seg s-neutral">
+            <div class="rail"><span class="dot"></span></div>
+            <div class="body"><span class="stop">Brienzer Straße <span class="flag f-flip">flips</span></span><span class="leg">352° N · 0.30 km</span></div>
+            <div class="side neutral">even</div>
+          </div>
+          <div class="seg s-right">
+            <div class="rail"><span class="dot"></span></div>
+            <div class="body"><span class="stop">Am Schäfersee</span><span class="leg">8° N · 0.36 km</span></div>
+            <div class="side right">shade →</div>
+          </div>
+          <div class="seg s-left">
+            <div class="rail"><span class="dot"></span></div>
+            <div class="body"><span class="stop">Residenzstraße <span class="flag f-flip">flips</span></span><span class="leg">264° W · 0.51 km</span></div>
+            <div class="side left">← shade</div>
+          </div>
+          <div class="seg exit s-left">
+            <div class="rail"><span class="dot"></span></div>
+            <div class="body"><span class="stop">U Seestraße <span class="flag f-exit">exit</span></span><span class="leg">arrive</span></div>
+            <div class="side neutral">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────── SCREEN B: best-departure finder ───────── -->
+  <div class="col">
+    <div class="caption">
+      <span class="step">Screen 3 · where to sit</span>
+      <h3>Best-departure finder, tied to real departures</h3>
+      <p class="src"><span class="new">new</span>ShadeSide's departure comparison — but transit-native. Each row is an <em>actual scheduled tram</em> from VBB, not an abstract time. The bar shows worst-side exposure; tapping recomputes everything below.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="top">
+        <button class="back">‹</button>
+        <div class="brand"><h1>Sun<span class="s">Side</span></h1><span class="tag">prototype</span></div>
+      </div>
+      <div class="pad">
+        <div class="route">
+          <span class="pill">Tram 50</span>
+          <span class="rt">Hugenottenplatz → U Seestraße</span>
+        </div>
+
+        <div class="dep">
+          <div class="dep-title">Leave a bit later?</div>
+          <div class="dep-lead">The <b>15:01</b> keeps you shaded for the whole ride — 5 min later than the next tram.</div>
+          <div class="deps">
+            <div class="dep-opt" aria-selected="false">
+              <span class="dt">14:56<span class="in">in 4 min</span></span>
+              <span class="dep-bar"><i class="mid" style="width:46%"></i></span>
+              <span class="dep-verd left">left · 71%</span>
+            </div>
+            <div class="dep-opt" aria-selected="true">
+              <span class="dt">15:01<span class="in">in 9 min</span></span>
+              <span class="dep-bar"><i class="good" style="width:18%"></i></span>
+              <span class="dep-verd left">left · 88%</span>
+            </div>
+            <div class="dep-opt" aria-selected="false">
+              <span class="dt">15:11<span class="in">in 19 min</span></span>
+              <span class="dep-bar"><i class="bad" style="width:74%"></i></span>
+              <span class="dep-verd right">right · 58%</span>
+            </div>
+          </div>
+          <div class="dep-foot">Bar = how much of the ride the sunny side is exposed. Shorter is shadier. The sun keeps dropping west, so later trams swing the verdict.</div>
+        </div>
+
+        <div class="verdict">
+          <div class="head">
+            <div class="vhead-row">
+              <div>
+                <div class="eyebrow">Where to sit · 15:01 tram</div>
+                <div class="big">
+                  <span class="dir-arrow" aria-hidden="true">
+                    <svg viewBox="0 0 40 32" width="38" height="30"><path d="M22 4 L6 16 L22 28 M6 16 H36" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </span>
+                  <span>Sit on the <span class="dir">left</span></span>
+                </div>
+              </div>
+              <div class="conf">
+                <div class="ring">
+                  <svg width="50" height="50" viewBox="0 0 50 50">
+                    <circle cx="25" cy="25" r="20" fill="none" stroke="#E4DDCE" stroke-width="6"/>
+                    <circle cx="25" cy="25" r="20" fill="none" stroke="#2B3A55" stroke-width="6" stroke-linecap="round" stroke-dasharray="125.6" stroke-dashoffset="13.8"/>
+                  </svg>
+                  <span class="pct">89%</span>
+                </div>
+                <span class="lbl">Confidence</span>
+              </div>
+            </div>
+            <div class="why">Picked your departure for you — the 15:01 spends 88% of the ride with shade on the left.</div>
+          </div>
+          <div class="meter">
+            <span class="m-left" style="flex-basis:78%">left shaded</span>
+            <span class="m-neutral" style="flex-basis:12%"></span>
+            <span class="m-right" style="flex-basis:10%"></span>
+          </div>
+          <div class="meter-key">
+            <span><span class="pctv">78%</span> · <b>6.2 km</b> left shaded</span>
+            <span><span class="pctv">10%</span> · <b>0.8 km</b> right</span>
+            <span><span class="pctv">12%</span> · <b>1.0 km</b> even</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────── SCREEN C: three-state map (multi-leg w/ underground) ───────── -->
+  <div class="col">
+    <div class="caption">
+      <span class="step">Screen 3 · optional map view</span>
+      <h3>Three-state route map, underground-aware</h3>
+      <p class="src"><span class="new">new</span>Sit In Shade's colored route line, redrawn in SunSide colors and extended with a fourth truth the brief already needs: an underground leg the shade logic skips. Map stays secondary — the spine is still default.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="top">
+        <button class="back">‹</button>
+        <div class="brand"><h1>Sun<span class="s">Side</span></h1><span class="tag">prototype</span></div>
+      </div>
+      <div class="pad">
+        <div class="route">
+          <span class="pill lu">U6</span>
+          <span class="pill lb">M21</span>
+          <span class="rt">Seestraße → S+U Jungfernheide</span>
+        </div>
+
+        <div class="underband">
+          <span class="ic">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M7 12a5 5 0 0 1 10 0"/></svg>
+          </span>
+          <span><b>U6 leg is underground</b> — no sun, sit anywhere. The recommendation below is for the M21 surface leg.</span>
+        </div>
+
+        <div class="map">
+          <svg viewBox="0 0 340 200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="340" height="200" fill="#EFE7D7"/>
+            <g stroke="#DAD0BC" stroke-width="1">
+              <line x1="0" y1="50" x2="340" y2="50"/><line x1="0" y1="100" x2="340" y2="100"/><line x1="0" y1="150" x2="340" y2="150"/>
+              <line x1="80" y1="0" x2="80" y2="200"/><line x1="170" y1="0" x2="170" y2="200"/><line x1="260" y1="0" x2="260" y2="200"/>
+            </g>
+            <!-- underground leg (dashed neutral) -->
+            <path d="M40 160 L40 95" fill="none" stroke="#C9C2B2" stroke-width="6" stroke-linecap="round" stroke-dasharray="3 8"/>
+            <!-- surface M21: amber where left catches sun (shade right) / indigo where right catches sun -->
+            <path d="M40 95 L120 95" fill="none" stroke="#2B3A55" stroke-width="6" stroke-linecap="round"/>
+            <path d="M120 95 L180 60" fill="none" stroke="#C9C2B2" stroke-width="6" stroke-linecap="round"/>
+            <path d="M180 60 L270 60 L300 40" fill="none" stroke="#F4A024" stroke-width="6" stroke-linecap="round"/>
+            <!-- stop dots -->
+            <circle cx="40" cy="160" r="6" fill="#D6492F"/>
+            <circle cx="40" cy="95" r="5" fill="#fff" stroke="#1C232E" stroke-width="2.5"/>
+            <circle cx="120" cy="95" r="5" fill="#fff" stroke="#1C232E" stroke-width="2.5"/>
+            <circle cx="180" cy="60" r="5" fill="#fff" stroke="#1C232E" stroke-width="2.5"/>
+            <circle cx="300" cy="40" r="6" fill="#1C232E"/>
+            <text x="48" y="176" font-family="ui-monospace,monospace" font-size="9" fill="#1C232E">Seestraße</text>
+            <text x="48" y="90" font-family="ui-monospace,monospace" font-size="9" fill="#1C232E">Kurt-Schumacher-Pl</text>
+            <text x="232" y="34" font-family="ui-monospace,monospace" font-size="9" fill="#1C232E">Jungfernheide</text>
+          </svg>
+          <div class="map-key">
+            <span><i class="l"></i> sun left → sit right</span>
+            <span><i class="r"></i> sun right → sit left</span>
+            <span><i class="n"></i> even / underground</span>
+          </div>
+        </div>
+
+        <div class="verdict">
+          <div class="head">
+            <div class="vhead-row">
+              <div>
+                <div class="eyebrow">Where to sit · M21 leg</div>
+                <div class="big">
+                  <span class="dir-arrow point-right" aria-hidden="true">
+                    <svg viewBox="0 0 40 32" width="38" height="30"><path d="M22 4 L6 16 L22 28 M6 16 H36" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </span>
+                  <span>Sit on the <span class="dir">right</span></span>
+                </div>
+              </div>
+              <div class="conf">
+                <div class="ring">
+                  <svg width="50" height="50" viewBox="0 0 50 50">
+                    <circle cx="25" cy="25" r="20" fill="none" stroke="#E4DDCE" stroke-width="6"/>
+                    <circle cx="25" cy="25" r="20" fill="none" stroke="#F4A024" stroke-width="6" stroke-linecap="round" stroke-dasharray="125.6" stroke-dashoffset="50.2"/>
+                  </svg>
+                  <span class="pct">60%</span>
+                </div>
+                <span class="lbl">Confidence</span>
+              </div>
+            </div>
+            <div class="why">A near call — the M21 turns enough that neither side wins by much. Right is shaded for the longest stretch.</div>
+          </div>
+          <div class="meter">
+            <span class="m-right" style="flex-basis:52%">right shaded</span>
+            <span class="m-neutral" style="flex-basis:20%"></span>
+            <span class="m-left" style="flex-basis:28%">left</span>
+          </div>
+          <div class="meter-key">
+            <span><span class="pctv">52%</span> · <b>1.4 km</b> right shaded</span>
+            <span><span class="pctv">28%</span> · <b>0.8 km</b> left</span>
+            <span><span class="pctv">20%</span> · <b>0.5 km</b> even</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────── SCREEN D: journey w/ honest-accuracy framing ───────── -->
+  <div class="col">
+    <div class="caption">
+      <span class="step">Screen 4 · follow the ride</span>
+      <h3>Live ride, with honest accuracy framing</h3>
+      <p class="src"><span class="new">new</span>SunRide's candour about limits, made calm and specific. The status card states what it can't see (vehicle, cloud) instead of overpromising — and the confidence chip rides along live as segments change.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="top">
+        <button class="back">‹</button>
+        <div class="brand"><h1>Sun<span class="s">Side</span></h1><span class="tag">prototype</span></div>
+      </div>
+      <div class="pad">
+        <div class="journey-status">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.6rem">
+            <div>
+              <div class="now-seg">Now · stop 12 of 28</div>
+              <div class="now-stops">Am Schäfersee → Residenzstraße</div>
+              <div class="now-side">Shade is on your <b>left</b> · sun low to the SW</div>
+            </div>
+            <span class="src-badge">📡 GPS</span>
+          </div>
+          <div class="js-controls">
+            <button class="play" aria-label="Pause">
+              <svg width="14" height="14" viewBox="0 0 12 12" fill="currentColor"><rect x="2" y="1.5" width="2.6" height="9" rx="1"/><rect x="7.4" y="1.5" width="2.6" height="9" rx="1"/></svg>
+            </button>
+            <span style="font-size:.72rem;color:var(--shade-soft)">Following live · 82% confidence on this leg</span>
+          </div>
+          <div class="progress"><span class="fill"></span></div>
+        </div>
+
+        <div class="spine">
+          <div class="seg s-left">
+            <div class="rail"><span class="dot"></span></div>
+            <div class="body"><span class="stop" style="color:var(--slate)">Brienzer Straße</span><span class="leg">passed</span></div>
+            <div class="side left">← shade</div>
+          </div>
+          <div class="seg current s-left">
+            <div class="rail"><span class="dot"></span></div>
+            <div class="body"><span class="stop">Am Schäfersee <span class="flag f-now">now</span></span><span class="leg">264° W · 0.36 km</span></div>
+            <div class="side left">← shade</div>
+          </div>
+          <div class="seg s-right">
+            <div class="rail"><span class="dot"></span></div>
+            <div class="body"><span class="stop">Residenzstraße <span class="flag f-flip">flips</span></span><span class="leg">12° N · 0.51 km</span></div>
+            <div class="side right">shade →</div>
+          </div>
+          <div class="seg s-left">
+            <div class="rail"><span class="dot"></span></div>
+            <div class="body"><span class="stop">Antonienstraße</span><span class="leg">271° W · 0.40 km</span></div>
+            <div class="side left">← shade</div>
+          </div>
+          <div class="seg exit s-left">
+            <div class="rail"><span class="dot"></span></div>
+            <div class="body"><span class="stop">U Seestraße <span class="flag f-exit">exit</span></span><span class="leg">3 stops away</span></div>
+            <div class="side neutral">—</div>
+          </div>
+        </div>
+
+        <div class="foot">
+          <b>What this can and can't see.</b> The side comes from the sun's real position against this
+          trip's geometry — accurate to the degree. It can't see cloud cover, window tint, or how the
+          tram is loaded, so treat a close call (low confidence) as a hint, not a promise.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -27,13 +27,13 @@
   .card:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(0,0,0,.12);border-color:#d4cbb8}
   .card:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
   .num{flex:0 0 auto;width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#fff;letter-spacing:-.5px}
-  .num.tram{background:var(--tram)} .num.re{background:var(--re)} .num.m21{background:var(--m21)}
+  .num.tram{background:var(--tram)} .num.re{background:var(--re)} .num.m21{background:var(--m21)} .num.feat{background:var(--shade)}
   .body{flex:1;min-width:0}
   .title{font-weight:700;font-size:16px;letter-spacing:-.2px;display:flex;align-items:center;gap:7px}
   .title .arrow{margin-left:auto;color:var(--muted);font-size:18px;transition:transform .14s ease}
   .card:hover .title .arrow{transform:translateX(3px);color:var(--ink)}
   .route{margin-top:3px;font-size:12px;color:var(--m21);font-weight:650}
-  .route.tram{color:var(--tram)} .route.re{color:var(--re)}
+  .route.tram{color:var(--tram)} .route.re{color:var(--re)} .route.feat{color:var(--shade)}
   .desc{margin-top:7px;font-size:13px;color:var(--muted)}
   .foot{margin-top:30px;font-size:12px;color:var(--muted);line-height:1.6;border-top:1px dashed var(--line);padding-top:16px}
   .foot b{color:var(--ink);font-weight:650}
@@ -95,6 +95,15 @@
         <div class="title">City MetroBus <span class="arrow">→</span></div>
         <div class="route m21">M21 / X21 · Wedding → Goerdelersteg</div>
         <div class="desc">A city bus run where the shaded side flips on the final northeast hook into the stop. Stops and bearings are real, from OpenStreetMap.</div>
+      </div>
+    </a>
+
+    <a class="card" href="015-competitor-feature-mockups/index.html">
+      <div class="num feat">015</div>
+      <div class="body">
+        <div class="title">Competitor features <span class="arrow">→</span></div>
+        <div class="route feat">Design study · four annotated screens</div>
+        <div class="desc">The genuinely useful features from competing shade-side apps, re-expressed in SunSide's own tokens and route-spine semantics — confidence ring, best-departure finder, route map, honest live framing.</div>
       </div>
     </a>
   </div>

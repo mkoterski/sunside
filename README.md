@@ -15,14 +15,16 @@ sunside/
   test/sun-side.test.mjs    pure-logic tests for the bearing / sun-side math
   wrangler.toml             one Worker serves BOTH the SPA and /api/*
   package.json              dev / deploy / test scripts
-  prototypes/               self-contained, openable prototypes (see prototypes/README.md)
+  prototypes/index.html     hub page linking to every prototype (start here)
+  prototypes/               numbered self-contained prototypes (see prototypes/README.md)
   misc/                     design brief and supporting notes
 ```
 
 > `prototypes/` holds self-contained offline prototypes, one numbered folder each
-> (`010-tram50-hugenottenpl-seestr-demo/` and so on; see `prototypes/README.md`) —
-> each is a single `index.html` you can open directly in any browser to explore a
-> flow or idea.
+> (`010-tram50-hugenottenpl-seestr-demo/` … `015-competitor-feature-mockups/`).
+> Each is a single `index.html` you can open directly in any browser to explore a
+> flow or idea — open `prototypes/index.html` for a hub that links to them all, or
+> see `prototypes/README.md` for the annotated index.
 > They're exploratory builds, not the production client: only `public/index.html`
 > is authoritative.
 

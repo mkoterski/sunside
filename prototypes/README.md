@@ -21,3 +21,4 @@ and the rest of the name records the line and route.
 | [`012-tram50-hugenottenpl-seestr-autoplay/`](012-tram50-hugenottenpl-seestr-autoplay/README.md) | A second take on the "follow the ride" screen — the journey view auto-advances on a timer, with play/pause and auto-scroll. |
 | [`013-aubertstr-ferdinandshof-regional/`](013-aubertstr-ferdinandshof-regional/README.md) | Long-distance, multi-modal regional-rail case — Aubertstraße 17 → Ferdinandshof (bus 154 → S2 → RE3). |
 | [`014-m21x21-seestr-goerdelersteg/`](014-m21x21-seestr-goerdelersteg/README.md) | City MetroBus case — Wedding → Goerdelersteg on the M21 / X21 corridor, where the shaded side flips on the final hook to the stop. |
+| [`015-competitor-feature-mockups/`](015-competitor-feature-mockups/README.md) | Annotated mockups folding the genuinely useful features from competing shade-side apps into SunSide's own design system — confidence ring, best-departure finder, route map, honest live framing. |
