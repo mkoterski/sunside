@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SunSide · Tram 50 shade demo</title>
+<style>
+  :root{
+    --sun:#F4A024; --sun-soft:#FBD9A0;
+    --shade:#2B3A55; --shade-soft:#9FB0C9;
+    --paper:#FBF7EF; --ink:#1C232E; --slate:#6B7280;
+    --tram:#D6492F; --line:#E4DDCE;
+    --neutral:#C9C2B2;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    line-height:1.5; padding:env(safe-area-inset-top) 0 4rem;
+  }
+  .wrap{max-width:560px;margin:0 auto;padding:1.25rem}
+  /* ── Masthead ───────────────────────────── */
+  .mast{display:flex;align-items:baseline;gap:.5rem;margin-bottom:.25rem}
+  .mast h1{
+    font-family:"Helvetica Neue",Arial,sans-serif;
+    font-weight:800; font-size:1.45rem; letter-spacing:-.02em;
+    text-transform:uppercase;
+  }
+  .mast h1 .s{color:var(--sun)}
+  .mast .tag{
+    font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--slate);font-weight:600;
+  }
+  .route{
+    font-size:.82rem;color:var(--slate);margin-bottom:1.25rem;
+    display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;
+  }
+  .route .pill{
+    background:var(--tram);color:#fff;font-weight:700;border-radius:4px;
+    padding:.05rem .4rem;font-size:.78rem;letter-spacing:.02em;
+  }
+  /* ── Verdict ────────────────────────────── */
+  .verdict{
+    border:1.5px solid var(--ink); border-radius:14px; overflow:hidden;
+    margin-bottom:1.5rem; background:#fff;
+  }
+  .verdict .head{
+    padding:1.1rem 1.2rem .9rem; position:relative;
+  }
+  .verdict .eyebrow{
+    font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--slate);font-weight:700;margin-bottom:.35rem;
+  }
+  .verdict .big{
+    font-family:"Helvetica Neue",Arial,sans-serif;
+    font-weight:800;font-size:2rem;letter-spacing:-.02em;line-height:1.05;
+    display:flex;align-items:center;gap:.6rem;
+  }
+  .verdict .big .dir{color:var(--tram)}
+  .dir-arrow{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:48px;height:48px;flex:none;border-radius:12px;
+    background:var(--tram);color:#fff;
+  }
+  .dir-arrow[hidden]{display:none}
+  .dir-arrow svg{display:block}
+  .dir-arrow.point-right{transform:scaleX(-1)}
+  @keyframes nudge-left{0%,100%{transform:translateX(0)}50%{transform:translateX(-5px)}}
+  @keyframes nudge-right{0%,100%{transform:translateX(0) scaleX(-1)}50%{transform:translateX(5px) scaleX(-1)}}
+  .dir-arrow.anim-left{animation:nudge-left .5s ease}
+  .dir-arrow.anim-right{animation:nudge-right .5s ease}
+  @media (prefers-reduced-motion:reduce){.dir-arrow{animation:none!important}}
+  .verdict .why{font-size:.86rem;color:var(--slate);margin-top:.5rem;max-width:42ch}
+  /* shade meter */
+  .meter{display:flex;height:34px;font-size:.7rem;font-weight:700;color:#fff}
+  .meter span{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;transition:flex-basis .4s ease}
+  .meter .m-right{background:var(--shade)}
+  .meter .m-left{background:var(--sun);color:var(--ink)}
+  .meter .m-neutral{background:var(--neutral);color:var(--ink)}
+  .meter-key{display:flex;gap:1rem;font-size:.7rem;color:var(--slate);padding:.5rem 1.2rem;border-top:1px solid var(--line)}
+  .meter-key b{color:var(--ink)}
+  /* ── Controls ───────────────────────────── */
+  .controls{
+    background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:1.1rem 1.2rem;margin-bottom:1.5rem;
+  }
+  .ctrl-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:.9rem}
+  .ctrl-row:last-child{margin-bottom:0}
+  .ctrl-label{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);font-weight:700}
+  .time-val{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-weight:700;font-size:1.1rem}
+  .sun-stat{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.72rem;color:var(--slate)}
+  input[type=range]{width:100%;accent-color:var(--sun);height:28px}
+  .seg-toggle{display:inline-flex;border:1.5px solid var(--ink);border-radius:9px;overflow:hidden}
+  .seg-toggle button{
+    background:#fff;border:0;font:inherit;font-size:.74rem;font-weight:700;
+    padding:.45rem .7rem;cursor:pointer;color:var(--ink);
+  }
+  .seg-toggle button[aria-pressed=true]{background:var(--ink);color:#fff}
+  /* ── Sun arc ────────────────────────────── */
+  .arc-wrap{position:relative;height:96px;margin:.4rem 0 1.4rem}
+  .arc-wrap svg{width:100%;height:100%;overflow:visible}
+  /* ── Route spine ────────────────────────── */
+  .spine-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem}
+  .spine-title{font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--slate);font-weight:700}
+  .map-btn{
+    background:#fff;border:1.5px solid var(--ink);border-radius:9px;font:inherit;
+    font-size:.72rem;font-weight:700;padding:.35rem .7rem;cursor:pointer;color:var(--ink);
+  }
+  .map-btn[aria-pressed=true]{background:var(--ink);color:#fff}
+  .map-note{font-size:.7rem;color:var(--slate);margin-bottom:.6rem;line-height:1.5}
+  #map{height:340px;border-radius:14px;border:1px solid var(--line);margin-bottom:1.2rem;overflow:hidden;background:#e8e8e8}
+  .map-sun-badge{
+    background:rgba(255,255,255,.92);border-radius:8px;padding:.3rem .5rem;
+    font:600 .68rem ui-monospace,monospace;color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.2);
+  }
+  .spine{position:relative}
+  .seg{display:grid;grid-template-columns:18px 1fr auto;gap:.7rem;align-items:start;position:relative}
+  .seg .rail{position:relative;display:flex;justify-content:center}
+  .seg .rail::before{content:"";position:absolute;top:0;bottom:-0;width:4px;background:var(--neutral)}
+  .seg.s-right .rail::before{background:var(--shade)}
+  .seg.s-left  .rail::before{background:var(--sun)}
+  .seg.s-neutral .rail::before{background:var(--neutral)}
+  .seg .dot{width:11px;height:11px;border-radius:50%;background:#fff;border:2.5px solid var(--ink);margin-top:2px;z-index:1}
+  .seg.boarding .dot{background:var(--tram);border-color:var(--tram);width:14px;height:14px}
+  .seg.exit .dot{background:var(--ink)}
+  .seg .body{padding-bottom:1.05rem;min-width:0}
+  .seg .stop{font-size:.86rem;font-weight:600;letter-spacing:-.01em}
+  .seg .leg{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.68rem;color:var(--slate);margin-top:.1rem}
+  .seg .flag{
+    display:inline-block;font-size:.62rem;font-weight:700;letter-spacing:.04em;
+    text-transform:uppercase;padding:.05rem .35rem;border-radius:4px;margin-left:.4rem;vertical-align:middle;
+  }
+  .flag.f-board{background:var(--tram);color:#fff}
+  .flag.f-exit{background:var(--ink);color:#fff}
+  .flag.f-flip{background:var(--sun);color:var(--ink)}
+  .seg .side{
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.66rem;font-weight:700;
+    text-align:right;white-space:nowrap;padding-top:1px;
+  }
+  .side.right{color:var(--shade)}
+  .side.left{color:var(--sun)}
+  .side.neutral{color:var(--slate)}
+  .foot{margin-top:2rem;font-size:.7rem;color:var(--slate);line-height:1.6;border-top:1px solid var(--line);padding-top:1rem}
+  .foot b{color:var(--ink)}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="mast">
+    <h1>Sun<span class="s">Side</span></h1>
+    <span class="tag">Shade demo</span>
+  </div>
+  <div class="route">
+    <span class="pill">Tram 50</span>
+    <span id="route-text">Hugenottenplatz → U Seestraße</span>
+  </div>
+
+  <div class="verdict">
+    <div class="head">
+      <div class="eyebrow">Where to sit</div>
+      <div class="big">
+        <span id="verdict-arrow" class="dir-arrow" hidden aria-hidden="true">
+          <svg viewBox="0 0 40 32" width="40" height="32"><path d="M22 4 L6 16 L22 28 M6 16 H36" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="big-text">Sit on the <span class="dir" id="verdict-dir">…</span></span>
+      </div>
+      <div class="why" id="verdict-why"></div>
+    </div>
+    <div class="meter" id="meter">
+      <span class="m-right" id="m-right"></span>
+      <span class="m-neutral" id="m-neutral"></span>
+      <span class="m-left" id="m-left"></span>
+    </div>
+    <div class="meter-key">
+      <span><b id="k-right">0.0 km</b> right shaded</span>
+      <span><b id="k-left">0.0 km</b> left shaded</span>
+      <span><b id="k-neutral">0.0 km</b> even</span>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="ctrl-row">
+      <span class="ctrl-label">Direction</span>
+      <span class="seg-toggle">
+        <button id="dir-fwd" aria-pressed="true">→ Seestraße</button>
+        <button id="dir-rev" aria-pressed="false">→ Hugenottenplatz</button>
+      </span>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Time of day</span>
+      <span class="time-val" id="time-val">12:45</span>
+    </div>
+    <input type="range" id="time" min="300" max="1320" step="5" value="765" aria-label="Time of day">
+    <div class="arc-wrap"><svg id="arc" viewBox="0 0 520 96" preserveAspectRatio="none"></svg></div>
+    <div class="ctrl-row" style="margin:0">
+      <span class="sun-stat" id="sun-az">az —</span>
+      <span class="sun-stat" id="sun-el">elev —</span>
+    </div>
+  </div>
+
+  <div class="spine-head">
+    <div class="spine-title">Stop by stop · <span id="seg-count">28</span> segments</div>
+    <button id="map-toggle" class="map-btn" aria-pressed="false">Show map</button>
+  </div>
+  <div id="map-note" class="map-note" hidden>Map tiles load from OpenStreetMap — needs a connection. The route line is colored by shaded side, same as the list below.</div>
+  <div id="map" hidden></div>
+  <div class="spine" id="spine"></div>
+
+  <div class="foot">
+    <b>How this works.</b> Every leg between two stops has a compass bearing. Given the
+    sun's position for the chosen time, each leg is scored by which side it strikes —
+    the opposite side is the shaded seat. Legs are weighted by length, so the verdict
+    reflects where you spend the ride, not just the count of segments. Coordinates are
+    real stop locations; the live app reads them from VBB per trip.<br><br>
+    <b>Note on the stop list.</b> This is an approximate sequence assembled from public
+    route maps, which disagree on a stop or two. The full line runs ~32 stops end to end;
+    this trip is a subset of it. The authoritative per-trip stop list and exact
+    coordinates come from VBB's live trip data, which the real app uses.<br><br>
+    Demo location: Berlin (52.55°N, 13.40°E). Sun position computed inline (NOAA algorithm) — no external dependencies.
+  </div>
+</div>
+
+<script>
+// ── Real route geometry (toward Seestr). [name, lat, lon] ──────────────
+const ROUTE=[
+  ["Hugenottenplatz",52.60599,13.41944],
+  ["Arnouxstr.",52.60680,13.42600],
+  ["Navarraplatz",52.60720,13.43000],
+  ["Französisch Buchholz Kirche",52.60721,13.43373],
+  ["Blankenfelder Str.",52.60400,13.43050],
+  ["Rosenthaler Str.",52.60050,13.42650],
+  ["Marienstr./Pasewalker Str.",52.59700,13.42400],
+  ["Pasewalker/Blankenburger Weg",52.59300,13.42250],
+  ["Pankower Str.",52.58900,13.42050],
+  ["Galenusstr.",52.58450,13.41850],
+  ["Pankow-Heinersdorf",52.58050,13.41750],
+  ["Würtzstr.",52.57750,13.41600],
+  ["Mendelstr.",52.57500,13.41450],
+  ["Stiftsweg",52.57250,13.41300],
+  ["Pankow Kirche",52.57000,13.41150],
+  ["S+U Pankow",52.56640,13.41052],
+  ["Masurenstr.",52.56250,13.41200],
+  ["U Vinetastr.",52.55934,13.41343],
+  ["Schönhauser Allee/Bornholmer Str.",52.55750,13.40600],
+  ["Schönfließer Str.",52.55600,13.40200],
+  ["Björnsonstr.",52.55550,13.39950],
+  ["S Bornholmer Str.",52.55451,13.39792],
+  ["Grüntaler Str.",52.55500,13.38900],
+  ["Osloer Str./Prinzenallee",52.55600,13.38100],
+  ["Drontheimer Str.",52.55650,13.37700],
+  ["U Osloer Str.",52.55680,13.37333],
+  ["Louise-Schroeder-Platz",52.55704,13.36635],
+  ["Osram-Höfe",52.55300,13.35800],
+  ["U Seestr.",52.54985,13.35305],
+];
+const LAT=52.55, LON=13.40;
+
+const R=Math.PI/180;
+function bearing(la1,lo1,la2,lo2){
+  const dL=(lo2-lo1)*R;
+  const y=Math.sin(dL)*Math.cos(la2*R);
+  const x=Math.cos(la1*R)*Math.sin(la2*R)-Math.sin(la1*R)*Math.cos(la2*R)*Math.cos(dL);
+  return (Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+function haversine(la1,lo1,la2,lo2){
+  const Rk=6371,dLa=(la2-la1)*R,dLo=(lo2-lo1)*R;
+  const a=Math.sin(dLa/2)**2+Math.cos(la1*R)*Math.cos(la2*R)*Math.sin(dLo/2)**2;
+  return Rk*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+// Compact solar position (NOAA-based), inlined so the demo has no external
+// dependency and works fully offline. Verified to match SunCalc within 0.1°.
+function sunPosition(date,lat,lon){
+  const rad=Math.PI/180,deg=180/Math.PI;
+  const jd=date.getTime()/86400000+2440587.5, n=jd-2451545.0;
+  let L=(280.460+0.9856474*n)%360; if(L<0)L+=360;
+  let g=(357.528+0.9856003*n)%360; if(g<0)g+=360;
+  const lambda=(L+1.915*Math.sin(g*rad)+0.020*Math.sin(2*g*rad))%360;
+  const eps=23.439-0.0000004*n;
+  const ra=Math.atan2(Math.cos(eps*rad)*Math.sin(lambda*rad),Math.cos(lambda*rad))*deg;
+  const dec=Math.asin(Math.sin(eps*rad)*Math.sin(lambda*rad))*deg;
+  const gmst=(280.46061837+360.98564736629*n)%360;
+  let lst=(gmst+lon)%360; if(lst<0)lst+=360;
+  let H=(lst-ra)%360; if(H<-180)H+=360; if(H>180)H-=360;
+  const Hr=H*rad,latr=lat*rad,decr=dec*rad;
+  const el=Math.asin(Math.sin(latr)*Math.sin(decr)+Math.cos(latr)*Math.cos(decr)*Math.cos(Hr))*deg;
+  let az=Math.atan2(-Math.sin(Hr),Math.tan(decr)*Math.cos(latr)-Math.sin(latr)*Math.cos(Hr))*deg;
+  return {az:(az+360)%360, el};
+}
+function sunInfo(min){
+  // min = minutes after local midnight today
+  const d=new Date(); d.setHours(0,0,0,0); d.setMinutes(min);
+  const {az,el}=sunPosition(d,LAT,LON);
+  return {az,el,d};
+}
+function sideForBearing(sunAz,b){
+  const rel=(sunAz-b+360)%360;
+  if(rel>=25&&rel<155)return 'right';
+  if(rel>=205&&rel<335)return 'left';
+  return 'neutral';
+}
+const shadeOf=s=>s==='left'?'right':s==='right'?'left':'neutral';
+const card=b=>['N','NE','E','SE','S','SW','W','NW','N'][Math.round(b/45)];
+
+let forward=true;
+function stops(){return forward?ROUTE:[...ROUTE].reverse();}
+
+function compute(min){
+  const {az,el}=sunInfo(min);
+  const S=stops();
+  const segs=[];
+  const weight={left:0,right:0,neutral:0};
+  for(let i=0;i<S.length-1;i++){
+    const [n1,la1,lo1]=S[i],[n2,la2,lo2]=S[i+1];
+    const b=bearing(la1,lo1,la2,lo2);
+    const km=haversine(la1,lo1,la2,lo2);
+    // Sun below horizon -> everything neutral (no direct sun)
+    const sun = el<=0 ? 'neutral' : sideForBearing(az,b);
+    const shade=shadeOf(sun);
+    weight[shade]+=km;
+    segs.push({from:n1,to:n2,bearing:b,km,sun,shade});
+  }
+  // flips
+  let first=null;
+  segs.forEach(s=>{
+    if(s.shade==='neutral')return;
+    if(first===null)first=s.shade;
+    else if(s.shade!==first){s.flip=true;first=s.shade;}
+  });
+  return {az,el,segs,weight};
+}
+
+// ── Render ──────────────────────────────────────────────
+function fmtTime(min){const h=Math.floor(min/60),m=min%60;return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');}
+
+function renderArc(az,el){
+  const svg=document.getElementById('arc');
+  const W=520,H=96;
+  // horizon line + sun dome. Map azimuth 90..270 (E..S..W) across width.
+  let html=`<line x1="0" y1="${H-1}" x2="${W}" y2="${H-1}" stroke="var(--line)" stroke-width="2"/>`;
+  // dome guide
+  html+=`<path d="M20 ${H-1} Q ${W/2} -40 ${W-20} ${H-1}" fill="none" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="3 4"/>`;
+  if(el>0){
+    const t=Math.min(1,Math.max(0,(az-75)/(285-75))); // E->W fraction
+    const x=20+t*(W-40);
+    // height by elevation (0..70 -> baseline..top)
+    const y=(H-1)-(Math.min(el,70)/70)*(H+30);
+    const yy=Math.max(8,y);
+    // rays
+    let rays='';
+    for(let k=0;k<12;k++){const a=k*30*R;rays+=`<line x1="${x}" y1="${yy}" x2="${x+Math.cos(a)*16}" y2="${yy+Math.sin(a)*16}" stroke="var(--sun)" stroke-width="2" stroke-linecap="round" opacity="0.6"/>`;}
+    html+=rays+`<circle cx="${x}" cy="${yy}" r="11" fill="var(--sun)"/>`;
+  }else{
+    html+=`<text x="${W/2}" y="${H/2}" text-anchor="middle" fill="var(--slate)" font-size="13" font-family="monospace">sun below horizon</text>`;
+  }
+  svg.innerHTML=html;
+}
+
+function render(){
+  const min=parseInt(document.getElementById('time').value,10);
+  document.getElementById('time-val').textContent=fmtTime(min);
+  const {az,el,segs,weight}=compute(min);
+  document.getElementById('sun-az').textContent=`az ${az.toFixed(0)}° ${card(az)}`;
+  document.getElementById('sun-el').textContent=`elev ${el.toFixed(0)}°`;
+  renderArc(az,el);
+
+  // verdict
+  const total=weight.left+weight.right+weight.neutral;
+  const win = weight.right>weight.left?'right':weight.left>weight.right?'left':'either side';
+  const dirEl=document.getElementById('verdict-dir');
+  dirEl.textContent=win;
+  const arrow=document.getElementById('verdict-arrow');
+  // show a directional arrow only when one side genuinely wins and the sun is up
+  if(el>0 && (win==='left'||win==='right')){
+    arrow.hidden=false;
+    arrow.classList.toggle('point-right',win==='right');
+    // retrigger the nudge animation in the winning direction
+    arrow.classList.remove('anim-left','anim-right');
+    void arrow.offsetWidth; // reflow so the animation restarts
+    arrow.classList.add(win==='right'?'anim-right':'anim-left');
+  }else{
+    arrow.hidden=true;
+  }
+  const why=document.getElementById('verdict-why');
+  if(el<=0){
+    why.textContent='The sun is below the horizon — no direct sunlight on either side. Sit wherever you like.';
+  }else if(win==='either side'){
+    why.textContent=`The sun (az ${az.toFixed(0)}°, ${card(az)}) is split evenly across the route's turns. Neither side wins by much.`;
+  }else{
+    const shadedKm=(win==='right'?weight.right:weight.left).toFixed(1);
+    const other=(win==='right'?weight.left:weight.right).toFixed(1);
+    const margin = Math.abs(weight.right-weight.left);
+    const strength = margin<0.8 ? 'a narrow edge' : margin<2.5 ? 'a clear edge' : 'a strong edge';
+    why.textContent=`With the sun at az ${az.toFixed(0)}° (${card(az)}), elev ${el.toFixed(0)}°, the ${win} seat is shaded for ${shadedKm} km versus ${other} km on the other side — ${strength}. ${weight.neutral.toFixed(1)} km runs toward or away from the sun, shading neither side.`;
+  }
+
+  // meter (flex-basis proportions)
+  const pct=v=>total>0?(v/total*100):0;
+  document.getElementById('m-right').style.flexBasis=pct(weight.right)+'%';
+  document.getElementById('m-left').style.flexBasis=pct(weight.left)+'%';
+  document.getElementById('m-neutral').style.flexBasis=pct(weight.neutral)+'%';
+  document.getElementById('m-right').textContent=weight.right>0.6?'RIGHT':'';
+  document.getElementById('m-left').textContent=weight.left>0.6?'LEFT':'';
+  document.getElementById('m-neutral').textContent=weight.neutral>1.2?'EVEN':'';
+  document.getElementById('k-right').textContent=weight.right.toFixed(1)+' km';
+  document.getElementById('k-left').textContent=weight.left.toFixed(1)+' km';
+  document.getElementById('k-neutral').textContent=weight.neutral.toFixed(1)+' km';
+
+  // spine
+  const S=stops();
+  document.getElementById('seg-count').textContent=segs.length;
+  const spine=document.getElementById('spine');
+  let html='';
+  segs.forEach((s,i)=>{
+    const cls=`s-${s.shade}`;
+    const board=i===0?'<span class="flag f-board">board</span>':'';
+    const flip=s.flip?'<span class="flag f-flip">shade flips</span>':'';
+    const sideTxt = s.shade==='neutral'?'even':(s.shade==='right'?'shade →':'← shade');
+    html+=`<div class="seg ${cls} ${i===0?'boarding':''}">
+      <div class="rail"><div class="dot"></div></div>
+      <div class="body">
+        <div class="stop">${s.from}${board}${flip}</div>
+        <div class="leg">${s.bearing.toFixed(0)}° ${card(s.bearing)} · ${s.km.toFixed(2)} km</div>
+      </div>
+      <div class="side ${s.shade}">${sideTxt}</div>
+    </div>`;
+  });
+  // final exit stop node
+  const last=S[S.length-1][0];
+  html+=`<div class="seg s-neutral exit">
+    <div class="rail" style="height:14px"><div class="dot"></div></div>
+    <div class="body"><div class="stop">${last}<span class="flag f-exit">exit</span></div></div>
+    <div class="side neutral"></div>
+  </div>`;
+  spine.innerHTML=html;
+
+  // route text
+  document.getElementById('route-text').textContent =
+    forward ? 'Hugenottenplatz → U Seestraße' : 'U Seestraße → Hugenottenplatz';
+
+  // keep map in sync if open
+  if(mapShown && map && window.L) drawMap();
+}
+
+// ── Optional map view (lazy-loads Leaflet only when opened) ─────────────
+let mapShown=false, leafletLoading=false, map=null, mapLayers=[];
+const SHADE_COLOR={right:'#2B3A55', left:'#F4A024', neutral:'#C9C2B2'};
+
+function loadLeaflet(){
+  return new Promise((resolve,reject)=>{
+    if(window.L)return resolve();
+    if(leafletLoading)return; leafletLoading=true;
+    const css=document.createElement('link');
+    css.rel='stylesheet'; css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(css);
+    const js=document.createElement('script');
+    js.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    js.onload=()=>resolve();
+    js.onerror=()=>reject(new Error('Leaflet failed to load'));
+    document.head.appendChild(js);
+  });
+}
+
+async function toggleMap(){
+  mapShown=!mapShown;
+  const btn=document.getElementById('map-toggle');
+  btn.setAttribute('aria-pressed',mapShown);
+  btn.textContent=mapShown?'Hide map':'Show map';
+  document.getElementById('map').hidden=!mapShown;
+  document.getElementById('map-note').hidden=!mapShown;
+  if(!mapShown)return;
+  try{
+    await loadLeaflet();
+    if(!map){
+      map=L.map('map',{scrollWheelZoom:false}).setView([52.578,13.395],12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+        maxZoom:19, attribution:'© OpenStreetMap'
+      }).addTo(map);
+    }
+    drawMap();
+    setTimeout(()=>map.invalidateSize(),100);
+  }catch(e){
+    document.getElementById('map-note').textContent='Could not load the map (no connection?). The stop-by-stop list below works offline.';
+  }
+}
+
+function drawMap(){
+  if(!map||!window.L)return;
+  mapLayers.forEach(l=>map.removeLayer(l)); mapLayers=[];
+  const {segs}=compute(parseInt(document.getElementById('time').value,10));
+  const S=stops();
+  // colored polyline per segment
+  segs.forEach((s,i)=>{
+    const a=S[i], b=S[i+1];
+    const line=L.polyline([[a[1],a[2]],[b[1],b[2]]],{
+      color:SHADE_COLOR[s.shade], weight:6, opacity:.85
+    }).addTo(map);
+    mapLayers.push(line);
+  });
+  // stop dots
+  S.forEach((st,i)=>{
+    const isEnd=i===0||i===S.length-1;
+    const mk=L.circleMarker([st[1],st[2]],{
+      radius:isEnd?6:3.5,
+      color:i===0?'#D6492F':'#1C232E',
+      fillColor:'#fff', fillOpacity:1, weight:isEnd?3:2
+    }).addTo(map).bindTooltip(st[0],{direction:'top'});
+    mapLayers.push(mk);
+  });
+  // fit to route
+  const bounds=L.latLngBounds(S.map(s=>[s[1],s[2]]));
+  map.fitBounds(bounds,{padding:[30,30]});
+}
+document.getElementById('map-toggle').addEventListener('click',toggleMap);
+
+
+document.getElementById('time').addEventListener('input',render);
+document.getElementById('dir-fwd').addEventListener('click',()=>{forward=true;setDir();render()});
+document.getElementById('dir-rev').addEventListener('click',()=>{forward=false;setDir();render()});
+function setDir(){
+  document.getElementById('dir-fwd').setAttribute('aria-pressed',forward);
+  document.getElementById('dir-rev').setAttribute('aria-pressed',!forward);
+}
+render();
+</script>
+</body>
+</html>

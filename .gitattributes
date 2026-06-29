@@ -1,0 +1,32 @@
+# Normalize line endings across macOS and Windows checkouts.
+# Without this, the same file can show as fully changed just from switching machines.
+
+# Default: let git detect text vs binary, and store text with LF in the repo.
+* text=auto eol=lf
+
+# Source and config files — always LF in the repo and on checkout.
+*.html  text eol=lf
+*.js    text eol=lf
+*.mjs   text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.toml  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.css   text eol=lf
+*.txt   text eol=lf
+.gitignore   text eol=lf
+.gitattributes text eol=lf
+.assetsignore  text eol=lf
+
+# Binary files — never touch line endings.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.pdf   binary
+*.zip   binary
+*.woff  binary
+*.woff2 binary
