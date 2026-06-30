@@ -244,6 +244,26 @@ header{
   display:flex;align-items:flex-start;gap:var(--sp2);margin-bottom:var(--sp4)}
 .warn-icon{flex-shrink:0;margin-top:1px}
 
+/* ── Best-departure finder ── */
+.finder{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:var(--sp4) var(--sp4) var(--sp3);margin-bottom:var(--sp4);box-shadow:var(--sh-sm)}
+.finder-hdr{font-size:var(--xs);font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--muted);margin-bottom:var(--sp3)}
+.finder-note{font-size:var(--xs);color:var(--muted);line-height:1.5;padding-bottom:var(--sp1)}
+.frow{display:flex;align-items:center;gap:var(--sp3);padding:var(--sp2);border-radius:var(--r-md);
+  cursor:pointer;border:1px solid transparent;transition:background var(--ease),border-color var(--ease)}
+.frow:hover{background:var(--offset)}
+.frow.chosen{border-color:oklch(from var(--accent) l c h/.4);background:var(--accent-bg)}
+.frow-time{min-width:42px;text-align:right;flex-shrink:0}
+.frow-mins{font-size:var(--sm);font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.frow-abs{font-size:10px;color:var(--faint);font-variant-numeric:tabular-nums}
+.frow-bar-wrap{flex:1;height:8px;border-radius:var(--r-full);background:var(--offset);overflow:hidden}
+.frow-bar{height:100%;border-radius:var(--r-full);background:var(--sun)}
+.frow-pct{font-size:var(--xs);color:var(--muted);min-width:78px;text-align:right;
+  font-variant-numeric:tabular-nums;flex-shrink:0;display:flex;align-items:center;justify-content:flex-end;gap:4px}
+.fbest{font-size:10px;font-weight:700;color:var(--ok);background:oklch(from var(--ok) l c h/.15);
+  border-radius:var(--r-full);padding:1px 6px}
+
 /* ── Animations ── */
 @keyframes fade-up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 .anim{animation:fade-up 260ms cubic-bezier(0.16,1,0.3,1) both}
@@ -379,6 +399,11 @@ let allDeps=[];
 let selDep=null;
 let selTrip=null;
 let radarVehicle=null; // live vehicle position from /radar
+let radarActive=false; // true only for the originally-selected real-time departure
+// Best-departure finder state: the chosen exit stop + the candidate departures of
+// the same line/direction we rank by shade, and the currently-active departure.
+let selStops=null, selStopIdx=null, selDepChosen=null;
+let candidateDeps=[], finderRows=[];
 
 // ── Sun ───────────────────────────────────────────────
 function sunInfo(lat,lon,when){
@@ -506,14 +531,18 @@ async function selectDep(idx){
       </div>
     </div>`;
 
-  // Fetch trip + radar in parallel
-  const [tripData, veh] = await Promise.all([
+  // Fetch trip + radar + sibling departures in parallel. The sibling list (same
+  // line/direction from the boarding stop) powers the best-departure finder; its
+  // geometry is identical to this trip, so no extra trip calls are needed.
+  const [tripData, veh, cands] = await Promise.all([
     fetchTrip(selDep.tripId),
-    fetchVehiclePosition(selDep)
+    fetchVehiclePosition(selDep),
+    fetchCandidateDeps(selDep)
   ]);
 
   selTrip=tripData;
   radarVehicle=veh;
+  candidateDeps=cands;
   renderVehicleStrip(veh);
   renderStops(tripData);
   show('scr-stops');
@@ -525,6 +554,26 @@ async function fetchTrip(tripId){
     const r=await fetch(`${API}/trips/${encodeURIComponent(tripId)}?stopovers=true&polyline=false`);
     return await r.json();
   }catch{return null}
+}
+
+// Upcoming departures of the SAME line + direction from the boarding stop. These
+// share the chosen trip's stop geometry, so the finder can rank them by shade
+// without fetching each one's trip. Cheap: one cached departures call.
+async function fetchCandidateDeps(dep){
+  if(!dep._sId)return [];
+  try{
+    const params='duration=90&results=40&bus=true&suburban=true&subway=true&tram=true&ferry=false&express=false&regional=false';
+    const r=await fetch(`${API}/stops/${dep._sId}/departures?${params}`).then(r=>r.json());
+    let list=(r.departures||[]).filter(d=>
+      d.line?.name===dep.line?.name && d.direction===dep.direction);
+    // Make sure the departure the user actually picked is in the list.
+    if(!list.some(d=>d.tripId&&d.tripId===dep.tripId))list.unshift(dep);
+    // Dedupe by tripId (fall back to scheduled time) and order by time.
+    const seen=new Set();
+    list=list.filter(d=>{const k=d.tripId||d.when||d.plannedWhen;if(seen.has(k))return false;seen.add(k);return true;});
+    list.sort((a,b)=>new Date(a.when||a.plannedWhen)-new Date(b.when||b.plannedWhen));
+    return list;
+  }catch{return []}
 }
 
 // ── Radar: find the actual vehicle on the map ──────────
@@ -621,6 +670,21 @@ function sideForBearing(sunAz,bearing){
   return 'neutral';                       // front / behind
 }
 
+// Fraction of the ride (0..1, distance-weighted) where the sun strikes a side —
+// i.e. how much of the trip the SUNNY side is exposed. Lower = shadier overall,
+// regardless of which side. This is what the best-departure finder ranks on:
+// because the geometry is fixed across departures of one line, the only thing
+// that changes between them is the sun, so a later departure can score lower
+// (e.g. the sun has dropped behind buildings or below the horizon by then).
+// Below the horizon → 0 (every departure equal); a sun under ~3° is treated as
+// not yet a window problem, matching the app's low-sun handling.
+function sunnyExposure(legs,sunAz,sunEl){
+  if(sunEl<-3)return 0;
+  let tot=0,exp=0;
+  for(const l of legs){tot+=l.km;if(sunEl>3&&sideForBearing(sunAz,l.bearing)!=='neutral')exp+=l.km;}
+  return tot>0?exp/tot:0;
+}
+
 // Build the list of bearings the rider actually experiences, boarding → exit.
 // Each leg carries its length (km) so we can weight by distance travelled.
 function buildLegs(stops, stopIdx){
@@ -638,9 +702,16 @@ function buildLegs(stops, stopIdx){
   return legs;
 }
 
-function calcSun(stopIdx, stops){
+function calcSun(stopIdx, stops, dep){
+  // `dep` defaults to the originally selected departure; the finder passes a
+  // sibling departure to re-run the verdict at that departure's time.
+  dep=dep||selDep;
+  selStopIdx=stopIdx; selStops=stops; selDepChosen=dep;
+  // Live radar only describes the vehicle we actually located, so it applies
+  // only when the active departure is that same trip — not a future sibling.
+  radarActive=!!(dep.tripId&&selDep&&dep.tripId===selDep.tripId);
   const dest=stops[stopIdx];
-  const depTime=new Date(selDep.when||selDep.plannedWhen);
+  const depTime=new Date(dep.when||dep.plannedWhen);
 
   // Sun position at departure time at boarding location. Over a typical Berlin
   // ride (minutes) the sun moves <1°, so a single sample is fine; the vehicle
@@ -684,7 +755,7 @@ function calcSun(stopIdx, stops){
 
   // Prefer live radar bearing only when there is essentially one straight leg,
   // since a single GPS heading can't represent a curved multi-segment ride.
-  if(radarVehicle?.bearing!=null && legs.length<=1){
+  if(radarActive && radarVehicle?.bearing!=null && legs.length<=1){
     trainBearing=radarVehicle.bearing;
     bearingSource='live vehicle GPS';
   }
@@ -699,6 +770,7 @@ function calcSun(stopIdx, stops){
   }
 
   renderResult(trainBearing,sunAz,sunEl,dest,stops[0],bearingSource,flipNote);
+  renderDepartureFinder();
   show('scr-result');
 }
 
@@ -739,7 +811,7 @@ function renderResult(trainBearing,sunAz,sunEl,dest,origin,src,flipNote){
 
   const warn=elLow?`<div class="warn"><span class="warn-icon">⚠️</span><span>Low sun angle (${sunEl.toFixed(0)}°) can reach past seat backs. Shade side still recommended.</span></div>`:'';
   const flip=flipNote?`<div class="warn"><span class="warn-icon">↪️</span><span>${flipNote}</span></div>`:'';
-  const radar=radarVehicle?`<div class="warn" style="background:var(--left-bg);border-color:var(--left-border)"><span class="warn-icon">📡</span><span>Train bearing from <strong>live vehicle GPS</strong> - most accurate result.</span></div>`:'';
+  const radar=(radarActive&&radarVehicle)?`<div class="warn" style="background:var(--left-bg);border-color:var(--left-border)"><span class="warn-icon">📡</span><span>Train bearing from <strong>live vehicle GPS</strong> - most accurate result.</span></div>`:'';
 
   document.getElementById('result-wrap').innerHTML=`
     <div class="result-card ${cardClass}">
@@ -748,6 +820,7 @@ function renderResult(trainBearing,sunAz,sunEl,dest,origin,src,flipNote){
       <div class="result-sub">${explain}</div>
     </div>
     ${warn}${flip}${radar}
+    <div id="dep-finder"></div>
     <div class="data-grid">
       <div class="data-row"><span class="dr-label">Line</span><span class="dr-val">${esc(lineName)} → ${esc(selDep.direction||'?')}</span></div>
       <div class="data-row"><span class="dr-label">Exit stop</span><span class="dr-val">${esc(dest.name)}</span></div>
@@ -781,6 +854,64 @@ function buildDiag(side){
 
 function bearingToCard(b){
   return['N','NE','E','SE','S','SW','W','NW','N'][Math.round(b/45)];
+}
+
+// ── Best-departure finder ──────────────────────────────
+// Rank the upcoming siblings of the chosen line/direction by how much of THIS
+// boarding→exit ride has a sun-struck side, and let the rider pick a shadier one.
+// Geometry is shared across siblings, so only the sun (i.e. the time) varies.
+function renderDepartureFinder(){
+  const box=document.getElementById('dep-finder');
+  if(!box)return;
+  finderRows=[];
+  const legs=buildLegs(selStops,selStopIdx);
+  const totalKm=legs.reduce((s,l)=>s+l.km,0);
+  // Need real geometry and at least two departures to compare.
+  if(!legs.length||totalKm<=0||candidateDeps.length<2){box.innerHTML='';return}
+
+  const now=Date.now();
+  let rows=candidateDeps.map(d=>{
+    const t=new Date(d.when||d.plannedWhen);
+    const {az,el}=sunInfo(uLat,uLon,t);
+    return {dep:d,t,ms:+t,exp:sunnyExposure(legs,az,el),el};
+  }).filter(r=>r.ms-now>-90000);          // drop anything already gone
+  rows.sort((a,b)=>a.ms-b.ms);
+  rows=rows.slice(0,5);
+  if(rows.length<2){box.innerHTML='';return}
+  finderRows=rows;
+
+  const exps=rows.map(r=>r.exp);
+  const spread=Math.max(...exps)-Math.min(...exps);
+  const minExp=Math.min(...exps);
+  const chosenMs=+new Date(selDepChosen.when||selDepChosen.plannedWhen);
+
+  let body;
+  if(rows.every(r=>r.el<-3)){
+    body=`<div class="finder-note">The sun is down for all of these — every departure is equally comfortable, so just take the next one.</div>`;
+  } else if(spread<0.10){
+    // Honest: minutes-apart departures barely move the sun. Don't fake precision.
+    body=`<div class="finder-note">All similar right now — the shade barely changes across these departures. Take whichever is convenient.</div>`;
+  } else {
+    body=rows.map((r,i)=>{
+      const mins=Math.round((r.ms-now)/60000);
+      const minsStr=mins<=0?'now':`${mins}′`;
+      const abs=r.t.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+      const pct=Math.round(r.exp*100);
+      const chosen=Math.abs(r.ms-chosenMs)<1000;
+      const isBest=r.exp<=minExp+1e-9;
+      return `<div class="frow ${chosen?'chosen':''}" onclick="pickDeparture(${i})">
+        <div class="frow-time"><div class="frow-mins">${minsStr}</div><div class="frow-abs">${abs}</div></div>
+        <div class="frow-bar-wrap"><div class="frow-bar" style="width:${Math.max(3,pct)}%"></div></div>
+        <div class="frow-pct">${pct}% sun${isBest&&!chosen?'<span class="fbest">shadiest</span>':''}</div>
+      </div>`;
+    }).join('');
+  }
+  box.innerHTML=`<div class="finder"><div class="finder-hdr">Leave a bit later?</div>${body}</div>`;
+}
+
+function pickDeparture(i){
+  const r=finderRows[i];
+  if(r)calcSun(selStopIdx,selStops,r.dep);
 }
 
 // ── Helpers ────────────────────────────────────────────

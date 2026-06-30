@@ -22,6 +22,18 @@ function sideForBearing(sunAz, b) {
   return "neutral";
 }
 
+// Distance-weighted fraction of the ride exposed to a sun-struck side (0..1).
+// The best-departure finder ranks departures on this; lower = shadier.
+function sunnyExposure(legs, sunAz, sunEl) {
+  if (sunEl < -3) return 0;
+  let tot = 0, exp = 0;
+  for (const l of legs) {
+    tot += l.km;
+    if (sunEl > 3 && sideForBearing(sunAz, l.bearing) !== "neutral") exp += l.km;
+  }
+  return tot > 0 ? exp / tot : 0;
+}
+
 let pass = 0, fail = 0;
 function eq(actual, expected, msg) {
   const ok = actual === expected;
@@ -65,6 +77,19 @@ eq(sideForBearing(185, 0), "neutral", "sun behind is neutral");
 // So the recommendation should change from none to LEFT - a real mid-trip flip.
 eq(sideForBearing(180, 0), "neutral", "flip leg1 N under S sun");
 eq(sideForBearing(180, 90), "right", "flip leg2 E under S sun");
+
+// ── Sunny-side exposure (best-departure finder) ─────────────
+// Sun below horizon: every departure equal, exposure is 0.
+eq(sunnyExposure([{ bearing: 0, km: 1 }], 90, -5), 0, "sun below horizon -> 0");
+// Northbound ride, sun due east well up: side-on the whole way -> exposure 1.
+near(sunnyExposure([{ bearing: 0, km: 2 }], 90, 30), 1, 1e-9, "fully side-on -> 1");
+// Sun straight ahead the whole ride: neutral, no sunny side -> 0.
+eq(sunnyExposure([{ bearing: 0, km: 1 }], 5, 30), 0, "sun ahead -> 0 exposure");
+// Mixed: one side-on leg (N-bound under E sun) + one neutral leg (E-bound under
+// E sun), equal length -> half the ride exposed.
+near(sunnyExposure([{ bearing: 0, km: 1 }, { bearing: 90, km: 1 }], 90, 30), 0.5, 1e-9, "half exposed");
+// Low sun (0..3 deg) is not yet treated as a window problem -> 0 despite side-on.
+eq(sunnyExposure([{ bearing: 0, km: 1 }], 90, 1), 0, "sun under 3 deg -> 0 exposure");
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
