@@ -552,7 +552,9 @@ async function fetchTrip(tripId){
   if(!tripId)return null;
   try{
     const r=await fetch(`${API}/trips/${encodeURIComponent(tripId)}?stopovers=true&polyline=false`);
-    return await r.json();
+    const data=await r.json();
+    // v6 wraps the payload as {trip:{...}}; older versions returned the trip bare.
+    return data.trip||data;
   }catch{return null}
 }
 
