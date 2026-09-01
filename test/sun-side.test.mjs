@@ -91,5 +91,41 @@ near(sunnyExposure([{ bearing: 0, km: 1 }, { bearing: 90, km: 1 }], 90, 30), 0.5
 // Low sun (0..3 deg) is not yet treated as a window problem -> 0 despite side-on.
 eq(sunnyExposure([{ bearing: 0, km: 1 }], 90, 1), 0, "sun under 3 deg -> 0 exposure");
 
+// ── v2A additions (route spine + shade meter invariants) ─────────────────────
+
+// The shade meter's per-side km totals must sum to the trip total, whatever the
+// sun does. Mirror of calcSun's weight loop.
+function kmBySide(legs, sunAz, sunEl) {
+  const w = { left: 0, right: 0, neutral: 0 };
+  for (const l of legs) w[sunEl < -3 ? "neutral" : sideForBearing(sunAz, l.bearing)] += l.km;
+  return w;
+}
+const METER_LEGS = [{ bearing: 0, km: 1.2 }, { bearing: 90, km: 0.8 }, { bearing: 45, km: 0.5 }];
+const w = kmBySide(METER_LEGS, 180, 40);
+near(w.left + w.right + w.neutral, 2.5, 1e-9, "meter km shares sum to trip total");
+const wDown = kmBySide(METER_LEGS, 180, -10);
+near(wDown.neutral, 2.5, 1e-9, "sun below horizon -> all km neutral");
+
+// The flip stop the spine tags must be the one the existing flipAt logic finds.
+// Mirror of calcSun's flip-detection loop.
+function findFlip(legs, sunAz) {
+  const shadeOf = s => s === "left" ? "right" : s === "right" ? "left" : null;
+  let firstReco = null;
+  for (let i = 0; i < legs.length; i++) {
+    const reco = shadeOf(sideForBearing(sunAz, legs[i].bearing));
+    if (reco) {
+      if (firstReco === null) firstReco = reco;
+      else if (reco !== firstReco) return legs[i].from;
+    }
+  }
+  return null;
+}
+// E-bound under a southern sun (shade left), then W-bound (shade right):
+// the flip is tagged at the second leg's from-stop.
+eq(findFlip([{ bearing: 90, km: 1, from: "A" }, { bearing: 270, km: 1, from: "B" }], 180), "B",
+  "spine flip tag matches flipAt logic");
+eq(findFlip([{ bearing: 90, km: 1, from: "A" }, { bearing: 100, km: 1, from: "B" }], 180), null,
+  "no flip tag on a straight-ish route");
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

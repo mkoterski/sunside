@@ -1,4 +1,4 @@
-# SunSide Berlin - v0.13
+# SunSide Berlin - v0.14
 
 **Status:** DEVELOPMENT
 **Versioning:** `v0.x` = development/testing, `v1.x` = production-ready
@@ -110,6 +110,8 @@ Worker - but two things still work:
 | Demo mode | A fixed Hugenottenplatz location for trying the flow without granting geolocation |
 | Exit picker | The trip's real stopover list, boarding stop marked, each later stop tappable |
 | Sun-side verdict | Sit left / sit right / neutral, with the sun's azimuth and elevation, computed per segment and distance-weighted |
+| Route spine | Travel-order stop list on the result screen; the rail between stops is tinted by which side the sun strikes on that segment, with board/exit/flips flags and per-segment bearing + km |
+| Shade meter | Distance-weighted km bar in the verdict card: shade-left / even / shade-right, each share paired with its number |
 | Flip warning | When the shaded side genuinely changes mid-trip, the verdict says so instead of averaging it away |
 | Live radar | The actual vehicle's GPS position via VBB radar; its live bearing is preferred on single-leg rides |
 | Best-departure finder | Ranks the next departures of the same line by sun exposure - and says honestly when they barely differ |
@@ -130,6 +132,17 @@ History before v0.10 predates the numbering and is archived by date.
 ### Changelog
 
 ```
+v0.14  2026-09-01  v2A design pass, part 1 (docs/design-handoff-v2a.md): the app
+                   finally shows the per-segment analysis it always computed.
+                   Route spine on the result screen (rail tinted by sunny side,
+                   board/exit/flips flags), shade meter with per-side km in the
+                   verdict card, sun bar now shows the analysed departure time
+                   instead of contradicting the finder, plus a11y (44px targets,
+                   keyboard-tabbable rows, focus rings) and motion polish. Two
+                   new pure-logic assertions: meter km shares sum to the trip
+                   total; the spine's flip tag matches the flipAt logic.
+                   Follow-the-ride (item 4) is deferred to its own release.
+
 v0.13  2026-09-01  F2 landed: the encrypted history module is integrated. The
                    start screen gets an opt-in card (set passphrase / unlock /
                    lock / clear); every verdict saves the ride; matching
@@ -176,7 +189,9 @@ one when an item lands.
 
 ### Planned features
 
-Nothing open right now.
+| ID | Pri | Item | Notes |
+|---|---|---|---|
+| F3 | P2 | Follow-the-ride screen | v2A item 4, deferred from v0.14 as the handoff itself suggests. Spec in [`docs/design-handoff-v2a.md`](docs/design-handoff-v2a.md) §4: clock/radar-driven journey view reusing the spine, with progress bar, pinned status card and play/pause. |
 
 ### Settled
 
@@ -218,8 +233,8 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.13`, DEVELOPMENT. The full loop works end to end against live
-data: departures → exit stop → verdict, with live radar, the best-departure
-finder and opt-in encrypted history, in German and English, deployed at the
-URL above. Verified in one desktop browser; design work is the next planned
-step.
+Prototype, `v0.14`, DEVELOPMENT. The full loop works end to end against live
+data: departures → exit stop → verdict with route spine and shade meter, live
+radar, the best-departure finder and opt-in encrypted history, in German and
+English, deployed at the URL above. Verified in one desktop browser. The v2A
+design pass is half landed; F3 (follow-the-ride) is the open half.

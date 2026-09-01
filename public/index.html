@@ -21,6 +21,7 @@
   --right:#c0392b;--right-bg:#fdecea;--right-border:oklch(from #c0392b l c h / 0.3);
   --sbahn:#068e2a;--ubahn:#005daa;--tram:#cc0000;--bus:#8b008b;--regional:#7a4e2d;
   --ok:#2d7a3a;
+  --rail-neutral:#d9d5ca;
   --sh-sm:0 1px 3px oklch(0.2 0.01 80/0.07);
   --sh-md:0 4px 16px oklch(0.2 0.01 80/0.09);
   --sh-lg:0 12px 40px oklch(0.2 0.01 80/0.14);
@@ -44,6 +45,7 @@
   --left:#5599e8;--left-bg:#0c1d35;--left-border:oklch(from #5599e8 l c h / 0.3);
   --right:#e86060;--right-bg:#2d0e0e;--right-border:oklch(from #e86060 l c h / 0.3);
   --sbahn:#2db84a;--ubahn:#4d96dd;--tram:#e84040;--bus:#c080e0;--regional:#c09060;
+  --rail-neutral:#3a4048;
   --sh-sm:0 1px 3px oklch(0 0 0/0.3);--sh-md:0 4px 16px oklch(0 0 0/0.4);--sh-lg:0 12px 40px oklch(0 0 0/0.5);
 }
 @media(prefers-color-scheme:dark){:root:not([data-theme]){
@@ -54,6 +56,7 @@
   --sun:#ffc040;--sun-bg:#281c06;--left:#5599e8;--left-bg:#0c1d35;
   --right:#e86060;--right-bg:#2d0e0e;
   --sbahn:#2db84a;--ubahn:#4d96dd;--tram:#e84040;--bus:#c080e0;
+  --rail-neutral:#3a4048;
   --sh-sm:0 1px 3px oklch(0 0 0/0.3);--sh-md:0 4px 16px oklch(0 0 0/0.4);
 }}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -216,8 +219,11 @@ header{
 .stop-item{display:flex;align-items:center;gap:var(--sp3);padding:var(--sp3);
   border-radius:var(--r-md);cursor:pointer;border:1px solid transparent;
   transition:background var(--ease),border-color var(--ease)}
-.stop-item:hover{background:var(--offset);border-color:var(--border)}
+.stop-item:hover{background:var(--offset);border-color:var(--border);transform:translateY(-1px);box-shadow:var(--sh-sm)}
 .stop-item.disabled{opacity:.4;pointer-events:none}
+/* v2A a11y: 44px minimum touch target, visible focus on keyboard-tabbable rows */
+.stop-item{min-height:44px;transition:background var(--ease),transform var(--ease),box-shadow var(--ease)}
+button:focus-visible,.dep-card:focus-visible,.stop-item:focus-visible{outline:2px solid var(--accent);outline-offset:-1px}
 .sdot{width:10px;height:10px;flex-shrink:0;border-radius:50%;border:2px solid var(--muted);background:var(--bg)}
 .sdot.origin{background:var(--accent);border-color:var(--accent)}
 .stop-name{font-size:var(--sm);flex:1}
@@ -254,6 +260,40 @@ header{
 .result-sub{font-size:var(--sm);color:var(--muted);max-width:32ch;line-height:1.55}
 
 /* ── Data grid ── */
+/* ── Shade meter (v2A item 2) ── */
+.meter{display:flex;height:9px;border-radius:5px;overflow:hidden;background:var(--offset);margin-top:var(--sp4);width:100%;max-width:280px}
+.meter-key{width:100%;max-width:280px}
+.meter>div{height:100%}
+.meter-key{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;
+  margin-top:6px;font-size:0.66rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.meter-key>span{min-width:0;white-space:nowrap}
+.meter-key .mk-c{text-align:center}
+.meter-key .mk-r{text-align:right}
+.mk-sw{font-size:0.6rem}
+
+/* ── Route spine (v2A item 1) ── */
+.spine{margin-bottom:var(--sp4)}
+.spine-eyebrow{font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--muted);margin-bottom:var(--sp3)}
+.spine-row{display:flex;gap:12px;min-height:46px}
+.spine-gutter{width:18px;flex-shrink:0;display:flex;flex-direction:column;align-items:center}
+.spine-dot{border-radius:50%;flex-shrink:0;z-index:2}
+.spine-dot.board{width:15px;height:15px;background:var(--accent)}
+.spine-dot.exit{width:13px;height:13px;background:var(--text)}
+.spine-dot.mid{width:9px;height:9px;background:var(--bg)}
+.spine-rail{flex:1;width:4px;border-radius:3px;margin:2px 0}
+.spine-body{flex:1;min-width:0;padding-bottom:14px}
+.spine-top{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp2)}
+.spine-name{font-size:0.9rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.spine-shade{font-size:0.72rem;font-weight:800;white-space:nowrap;flex-shrink:0}
+.spine-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px;
+  font-size:0.7rem;color:var(--faint);font-variant-numeric:tabular-nums}
+.spine-flag{font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;
+  padding:1px 7px;border-radius:999px}
+.spine-flag.board{background:var(--accent);color:#fff}
+.spine-flag.exit{background:var(--text);color:var(--inv)}
+.spine-flag.flips{background:var(--sun);color:#1c1a15}
+
 .data-grid{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:var(--sp4)}
 .data-row{display:flex;align-items:center;justify-content:space-between;padding:var(--sp3) var(--sp4);border-bottom:1px solid var(--divider);font-size:var(--sm)}
 .data-row:last-child{border-bottom:none}
@@ -484,6 +524,10 @@ de:{
   histClear:'Löschen',
   histClearConfirm:'Verlauf komplett löschen? Das ist endgültig.',
   histRecent:'zuletzt',
+  route:'Die Route',
+  flagBoard:'einstieg', flagExit:'ausstieg', flagFlips:'wechsel',
+  shadeLeftLbl:'← Schatten', shadeRightLbl:'Schatten →',
+  evenLbl:'neutral', sunDownLbl:'Sonne unten',
 },
 en:{
   azLabel:'az', elevLabel:'elev',
@@ -548,6 +592,10 @@ en:{
   histClear:'Clear',
   histClearConfirm:'Delete the whole history? This is final.',
   histRecent:'recent',
+  route:'The route',
+  flagBoard:'board', flagExit:'exit', flagFlips:'flips',
+  shadeLeftLbl:'← shade', shadeRightLbl:'shade →',
+  evenLbl:'even', sunDownLbl:'sun down',
 }};
 let lang=(function(){try{const s=localStorage.getItem('sunside/lang');if(s==='de'||s==='en')return s}catch(e){}return 'de'})();
 function t(key){return STR[lang][key]}
@@ -649,7 +697,7 @@ function histSaveTrip(dep,fromStop,toStop){
 // directly. Testing-only: that path shares VBB's global 100 req/min bucket.
 const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
   ||(typeof location!=='undefined'&&location.hostname.endsWith('github.io')?'https://v6.vbb.transport.rest':'/api');
-console.log('SunSide Berlin v0.13 - API base:',API);
+console.log('SunSide Berlin v0.14 - API base:',API);
 let uLat=null,uLon=null;
 let allDeps=[];
 let selDep=null;
@@ -660,6 +708,8 @@ let radarActive=false; // true only for the originally-selected real-time depart
 // the same line/direction we rank by shade, and the currently-active departure.
 let selStops=null, selStopIdx=null, selDepChosen=null;
 let candidateDeps=[], finderRows=[];
+let legAnalysis=null;  // spine + meter data, set per verdict in calcSun (v2A)
+let sunBarWhen=null;   // analysed departure time; null = live clock (v2A item 3)
 
 // ── Sun ───────────────────────────────────────────────
 function sunInfo(lat,lon,when){
@@ -671,14 +721,19 @@ function sunInfo(lat,lon,when){
 function cardinalFromAz(az){
   return ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round(az/22.5)%16];
 }
-function updateSunBar(lat,lon){
-  const {az,el}=sunInfo(lat,lon);
-  document.getElementById('sb-az').textContent=az.toFixed(1)+'°';
+// Renders the sun at `when` if given, else now. While a trip is analysed,
+// sunBarWhen holds the departure time so the bar matches the verdict instead
+// of contradicting it for later departures picked in the finder (v2A item 3).
+function updateSunBar(lat,lon,when){
+  const at=when||new Date();
+  const {az,el}=sunInfo(lat,lon,at);
+  const down=el<-3; // below horizon: azimuth is real but misleading - show a dash
+  document.getElementById('sb-az').textContent=down?'—':az.toFixed(1)+'°';
   document.getElementById('sb-el').textContent=el.toFixed(1)+'°';
-  document.getElementById('sb-dir').textContent=cardinalFromAz(az);
-  document.getElementById('sb-time').textContent=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('sb-dir').textContent=down?'—':cardinalFromAz(az);
+  document.getElementById('sb-time').textContent=at.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
 }
-setInterval(()=>{if(uLat)updateSunBar(uLat,uLon)},60000);
+setInterval(()=>{if(uLat)updateSunBar(uLat,uLon,sunBarWhen)},60000);
 
 // ── Location ──────────────────────────────────────────
 function requestLocation(){
@@ -752,7 +807,7 @@ function renderDeps(deps){
     const delayTag=delay>0?`<div class="delay-tag">+${delay} min</div>`:'';
     const liveTag=d.when&&d.delay!==null?'<span class="live-badge"><span class="live-dot"></span>LIVE</span>':'';
     return `
-    <div class="dep-card anim" style="animation-delay:${i*35}ms" onclick="selectDep(${i})">
+    <div class="dep-card anim" style="animation-delay:${i*35}ms" onclick="selectDep(${i})" tabindex="0" role="button">
       <div class="line-badge ${badgeClass(prod)}">${esc(name)}</div>
       <div class="dep-info">
         <div class="dep-dest">${esc(dest)}${histMatches(name,dest)?recentTag():''}</div>
@@ -903,7 +958,7 @@ function renderStops(trip){
     const tm=s.arrival?new Date(s.arrival).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'';
     const disabled=i===0?'disabled':'';
     return `
-    <div class="stop-item ${disabled}" onclick="calcSun(${i},${JSON.stringify(stops).replace(/"/g,'&quot;')})">
+    <div class="stop-item anim ${disabled}" style="animation-delay:${i*35}ms" onclick="calcSun(${i},${JSON.stringify(stops).replace(/"/g,'&quot;')})"${disabled?'':' tabindex="0" role="button"'}>
       <div class="sdot ${i===0?'origin':''}"></div>
       <div class="stop-name">${esc(s.name)}${i===0?` <span style="color:var(--accent);font-size:var(--xs)">${t('boardingHere')}</span>`:i>0&&recentTo.has(s.name)?recentTag():''}</div>
       ${tm?`<div class="stop-time">${tm}</div>`:''}
@@ -983,6 +1038,8 @@ function calcSun(stopIdx, stops, dep){
   // ride (minutes) the sun moves <1°, so a single sample is fine; the vehicle
   // bearing is what actually varies, so that is what we resolve per segment.
   const {az:sunAz,el:sunEl}=sunInfo(uLat,uLon,depTime);
+  sunBarWhen=depTime;
+  updateSunBar(uLat,uLon,depTime);
 
   // Segment-aware analysis: walk every leg between boarding and exit.
   const legs=buildLegs(stops,stopIdx);
@@ -990,6 +1047,7 @@ function calcSun(stopIdx, stops, dep){
   let trainBearing=null;        // representative bearing for the display/diagram
   let bearingSource={key:'estimated'}; // resolved into words at render time (i18n)
   let flipStop='';              // set when the shaded side changes mid-trip
+  legAnalysis=null;             // per-leg data for the spine + meter (v2A)
 
   if(legs.length){
     // Weight each leg's side by its length, pick the dominant non-neutral side.
@@ -1015,6 +1073,18 @@ function calcSun(stopIdx, stops, dep){
       }
     }
     if(flipAt){flipStop=flipAt}
+
+    // Everything the route spine and shade meter render (v2A items 1+2). The
+    // per-leg sides and km weights are computed above anyway - this just keeps
+    // them. Below the horizon every segment is 'down' and the meter is all even.
+    legAnalysis={
+      rows:stops.slice(0,stopIdx+1),
+      legs:legs.map((l,i)=>({from:l.from,to:l.to,bearing:l.bearing,km:l.km,side:sunEl<-3?'down':sides[i]})),
+      kmShadeLeft:sunEl<-3?0:weight.right,   // sun strikes right -> shade is LEFT
+      kmShadeRight:sunEl<-3?0:weight.left,   // sun strikes left  -> shade is RIGHT
+      kmEven:sunEl<-3?weight.left+weight.right+weight.neutral:weight.neutral,
+      flip:flipStop
+    };
   }
 
   // Prefer live radar bearing only when there is essentially one straight leg,
@@ -1085,6 +1155,7 @@ function renderResult(trainBearing,sunAz,sunEl,dest,origin,src,flipStop){
       ${diag}
       <div class="result-headline ${hlClass}">${hl}</div>
       <div class="result-sub">${explain}</div>
+      ${renderMeter()}
     </div>
     ${warn}${flip}${radar}
     <div id="dep-finder"></div>
@@ -1096,9 +1167,69 @@ function renderResult(trainBearing,sunAz,sunEl,dest,origin,src,flipStop){
       <div class="data-row"><span class="dr-label">${t('lblEl')}</span><span class="dr-val">${sunEl.toFixed(1)}°</span></div>
       <div class="data-row"><span class="dr-label">${t('lblRel')}</span><span class="dr-val">${rel.toFixed(0)}° (${rel<180?t('rightWindow'):t('leftWindow')})</span></div>
     </div>
+    ${renderSpine()}
     <div style="text-align:center;padding-bottom:var(--sp10)">
       <button class="btn btn-ghost" onclick="show('scr-deps')">${t('backToDeps')}</button>
     </div>`;
+}
+
+// ── Shade meter (v2A item 2) ───────────────────────────
+// One horizontal bar: distance-weighted shade-left / even / shade-right km.
+// Colour is never the only signal - each share is paired with its number.
+function renderMeter(){
+  if(!legAnalysis)return'';
+  const {kmShadeLeft:kl,kmEven:kn,kmShadeRight:kr}=legAnalysis;
+  const tot=kl+kn+kr;
+  if(tot<=0)return'';
+  const pct=km=>(km/tot*100).toFixed(1)+'%';
+  return `
+  <div class="meter" aria-hidden="true">
+    <div style="width:${pct(kl)};background:var(--left)"></div>
+    <div style="width:${pct(kn)};background:var(--rail-neutral)"></div>
+    <div style="width:${pct(kr)};background:var(--right)"></div>
+  </div>
+  <div class="meter-key">
+    <span><span class="mk-sw" style="color:var(--left)">■</span> ← ${kl.toFixed(1)} km</span>
+    <span class="mk-c">${kn.toFixed(1)}</span>
+    <span class="mk-r">${kr.toFixed(1)} km → <span class="mk-sw" style="color:var(--right)">■</span></span>
+  </div>`;
+}
+
+// ── Route spine (v2A item 1) ───────────────────────────
+// Travel-order stop list; the rail between stops is tinted by the side the sun
+// strikes on that segment (so the shade label reads the opposite side). Row i
+// carries the leg DEPARTING stop i; the exit row has no rail.
+function renderSpine(){
+  if(!legAnalysis||!legAnalysis.legs.length)return'';
+  const {rows,legs,flip}=legAnalysis;
+  const railColor=s=>s==='right'?'var(--left)':s==='left'?'var(--right)':'var(--rail-neutral)';
+  const shadeLbl=s=>s==='right'?t('shadeLeftLbl'):s==='left'?t('shadeRightLbl'):s==='down'?t('sunDownLbl'):t('evenLbl');
+  const html=rows.map((s,i)=>{
+    const leg=legs[i];             // undefined on the exit row
+    const last=i===rows.length-1;
+    const dot=i===0?'<div class="spine-dot board"></div>'
+      :last?'<div class="spine-dot exit"></div>'
+      :`<div class="spine-dot mid" style="border:2px solid ${railColor(leg.side)}"></div>`;
+    const rail=leg?`<div class="spine-rail" style="background:${railColor(leg.side)}"></div>`:'';
+    const flags=[
+      i===0?`<span class="spine-flag board">${t('flagBoard')}</span>`:'',
+      last?`<span class="spine-flag exit">${t('flagExit')}</span>`:'',
+      flip&&s.name===flip?`<span class="spine-flag flips">${t('flagFlips')}</span>`:'',
+    ].join('');
+    const meta=leg?`${flags}<span>${Math.round(leg.bearing)}° ${cardinalFromAz(leg.bearing)} · ${leg.km.toFixed(2)} km</span>`:flags;
+    return `
+    <div class="spine-row anim" style="animation-delay:${i*35}ms">
+      <div class="spine-gutter">${dot}${rail}</div>
+      <div class="spine-body" ${last?'style="padding-bottom:0"':''}>
+        <div class="spine-top">
+          <span class="spine-name">${esc(s.name)}</span>
+          ${leg?`<span class="spine-shade" style="color:${railColor(leg.side)}">${shadeLbl(leg.side)}</span>`:''}
+        </div>
+        ${meta?`<div class="spine-meta">${meta}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="spine"><div class="spine-eyebrow">${t('route')}</div>${html}</div>`;
 }
 
 function buildDiag(side){
@@ -1193,12 +1324,26 @@ function esc(s){
 function show(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  // Off the result screen the analysed departure no longer applies - the sun
+  // bar goes back to the live clock (v2A item 3).
+  if(sunBarWhen&&(id==='scr-perm'||id==='scr-deps')){
+    sunBarWhen=null;
+    if(uLat)updateSunBar(uLat,uLon);
+  }
 }
 function showErr(msg){
   document.getElementById('dep-list').innerHTML=`<div class="state-view"><div class="sv-icon">⚠️</div><h2>${t('error')}</h2><p>${msg}</p><button class="btn btn-ghost" onclick="show('scr-perm')" style="margin-top:var(--sp4)">${t('startOver')}</button></div>`;
   show('scr-deps');
 }
 function doRefresh(){if(uLat){show('scr-load');updateSunBar(uLat,uLon);loadDeps()}}
+
+// v2A a11y: card rows carry role="button" + tabindex, so Enter/Space must
+// activate them like a real button. One delegated listener, not per-card.
+document.addEventListener('keydown',e=>{
+  if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('.dep-card,.stop-item')){
+    e.preventDefault();e.target.click();
+  }
+});
 
 // Apply the persisted (or default German) language to the static markup on load.
 applyLang();
