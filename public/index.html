@@ -393,7 +393,11 @@ header{
 // which the Cloudflare Worker serves (cache + single-flight in front of VBB).
 // To bypass the proxy during local dev, set window.SUNSIDE_API before this script,
 // e.g. a separate script tag setting window.SUNSIDE_API='https://v6.vbb.transport.rest'
-const API=(typeof window!=='undefined'&&window.SUNSIDE_API)||'/api';
+// On GitHub Pages there is no Worker behind /api, so fall back to calling VBB
+// directly. Testing-only: that path shares VBB's global 100 req/min bucket.
+const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
+  ||(typeof location!=='undefined'&&location.hostname.endsWith('github.io')?'https://v6.vbb.transport.rest':'/api');
+console.log('SunSide Berlin v0.10 - API base:',API);
 let uLat=null,uLon=null;
 let allDeps=[];
 let selDep=null;
