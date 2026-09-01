@@ -67,7 +67,7 @@ promise.
 
 ## Design fidelity
 
-Everything derives from `misc/SunSide-design-brief.md`:
+Everything derives from `docs/design-brief.md`:
 
 - **Tokens** — `--sun #F4A024`, `--shade #2B3A55`, `--paper #FBF7EF`,
   `--tram #D6492F`, etc., used verbatim.

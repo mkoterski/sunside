@@ -531,7 +531,7 @@ document.getElementById('lang-toggle').addEventListener('click',()=>{lang=lang==
 // directly. Testing-only: that path shares VBB's global 100 req/min bucket.
 const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
   ||(typeof location!=='undefined'&&location.hostname.endsWith('github.io')?'https://v6.vbb.transport.rest':'/api');
-console.log('SunSide Berlin v0.11 - API base:',API);
+console.log('SunSide Berlin v0.12 - API base:',API);
 let uLat=null,uLon=null;
 let allDeps=[];
 let selDep=null;
