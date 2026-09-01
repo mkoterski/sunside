@@ -158,8 +158,12 @@ async function getUpstream(path, search) {
   const ttl = ttlForPath(path);
   const promise = (async () => {
     const upstreamUrl = `${UPSTREAM}/${path}${search || ""}`;
+    // Hard timeout: when VBB is down its connections hang rather than refuse,
+    // which without this held every client on a loading screen indefinitely.
+    // Failing fast lets the catch below serve stale cache or an honest 502.
     const res = await fetch(upstreamUrl, {
       headers: { "Accept": "application/json", "User-Agent": "sunside-berlin-poc" },
+      signal: AbortSignal.timeout(8000),
     });
     const body = await res.text();
     const entry = { body, status: res.status, expires: Date.now() + ttl * 1000 };

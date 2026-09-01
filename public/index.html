@@ -516,6 +516,7 @@ de:{
   locDenied:'Standort abgelehnt - Demo wird verwendet.',
   noStopsNearby:'Keine Haltestellen in der Nähe gefunden.',
   loadFailed:'Laden fehlgeschlagen. Prüfe deine Verbindung.',
+  srcDown:'Die VBB-Datenquelle antwortet gerade nicht. Das kommt vor - versuch es in ein paar Minuten noch einmal.',
   stopsWithin:n=>`${n} Haltestellen im Umkreis von 700 m`,
   noDeps:'Keine Abfahrten',
   noDepsText:'In den nächsten 35 Minuten fährt hier nichts ab.',
@@ -592,6 +593,7 @@ en:{
   locDenied:'Location denied - using demo.',
   noStopsNearby:'No stops found nearby.',
   loadFailed:'Failed to load. Check connection.',
+  srcDown:'The VBB data source is not responding right now. It happens - try again in a few minutes.',
   stopsWithin:n=>`${n} stops within 700 m`,
   noDeps:'No departures',
   noDepsText:'Nothing departing nearby in the next 35 min.',
@@ -755,7 +757,7 @@ function histSaveTrip(dep,fromStop,toStop){
 // directly. Testing-only: that path shares VBB's global 100 req/min bucket.
 const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
   ||(typeof location!=='undefined'&&location.hostname.endsWith('github.io')?'https://v6.vbb.transport.rest':'/api');
-console.log('SunSide Berlin v0.15 - API base:',API);
+console.log('SunSide Berlin v0.16 - API base:',API);
 let uLat=null,uLon=null;
 let allDeps=[];
 let selDep=null;
@@ -810,20 +812,27 @@ function useDemo(){
   loadDeps();
 }
 
+// All API calls fail fast instead of hanging: when the VBB source is down its
+// connections stall rather than refuse, and without a deadline the app sat on
+// the loading screen indefinitely (observed during the 2026-09-01 outages).
+function apiFetch(url){return fetch(url,{signal:AbortSignal.timeout(12000)})}
+
 // ── Load nearby departures ─────────────────────────────
 async function loadDeps(){
   try{
     // Round coords to 3 decimals (~110m grid) so nearby users hit identical
     // cache keys at the proxy. This multiplies cache hit rate during clustering.
     const qLat=uLat.toFixed(3), qLon=uLon.toFixed(3);
-    const nr=await fetch(`${API}/locations/nearby?latitude=${qLat}&longitude=${qLon}&distance=700&results=10`).then(r=>r.json());
+    const resp=await apiFetch(`${API}/locations/nearby?latitude=${qLat}&longitude=${qLon}&distance=700&results=10`);
+    if(!resp.ok){showErr(resp.status>=500?t('srcDown'):t('loadFailed'));return}
+    const nr=await resp.json();
     if(!nr.length){showErr(t('noStopsNearby'));return}
     lastStopCount=nr.length;setLocLabel();
 
     // Fan out to 4 stops (was 6). At 4 deps/stop that is still plenty of choice
     // while cutting upstream load by a third per session.
     const proms=nr.slice(0,4).map(s=>
-      fetch(`${API}/stops/${s.id}/departures?duration=35&results=8&bus=true&suburban=true&subway=true&tram=true&ferry=false&express=false&regional=false`)
+      apiFetch(`${API}/stops/${s.id}/departures?duration=35&results=8&bus=true&suburban=true&subway=true&tram=true&ferry=false&express=false&regional=false`)
         .then(r=>r.json())
         .then(d=>(d.departures||[]).map(x=>({...x,_sId:s.id,_sName:s.name})))
         .catch(()=>[])
@@ -841,7 +850,12 @@ async function loadDeps(){
     allDeps=deps.slice(0,14);
     renderDeps(allDeps);
     show('scr-deps');
-  }catch(e){console.error(e);showErr(t('loadFailed'))}
+  }catch(e){
+    console.error(e);
+    // A timeout means the request stalled, which in practice is the data
+    // source hanging - tell the truth rather than blaming the connection.
+    showErr(e?.name==='TimeoutError'?t('srcDown'):t('loadFailed'));
+  }
 }
 let lastStopCount=0;
 function setLocLabel(){document.getElementById('loc-label').textContent=t('stopsWithin')(lastStopCount)}
@@ -923,7 +937,7 @@ function renderJourneyCard(){
 async function fetchTrip(tripId){
   if(!tripId)return null;
   try{
-    const r=await fetch(`${API}/trips/${encodeURIComponent(tripId)}?stopovers=true&polyline=false`);
+    const r=await apiFetch(`${API}/trips/${encodeURIComponent(tripId)}?stopovers=true&polyline=false`);
     const data=await r.json();
     // v6 wraps the payload as {trip:{...}}; older versions returned the trip bare.
     return data.trip||data;
@@ -937,7 +951,7 @@ async function fetchCandidateDeps(dep){
   if(!dep._sId)return [];
   try{
     const params='duration=90&results=40&bus=true&suburban=true&subway=true&tram=true&ferry=false&express=false&regional=false';
-    const r=await fetch(`${API}/stops/${dep._sId}/departures?${params}`).then(r=>r.json());
+    const r=await apiFetch(`${API}/stops/${dep._sId}/departures?${params}`).then(r=>r.json());
     let list=(r.departures||[]).filter(d=>
       d.line?.name===dep.line?.name && d.direction===dep.direction);
     // Make sure the departure the user actually picked is in the list.
@@ -956,7 +970,7 @@ async function fetchVehiclePosition(dep){
   const D=0.014; // ~1km in degrees
   const bbox=`north=${uLat+D}&south=${uLat-D}&west=${uLon-D}&east=${uLon+D}`;
   try{
-    const r=await fetch(`${API}/radar?${bbox}&results=64&duration=20&frames=1&polylines=false`);
+    const r=await apiFetch(`${API}/radar?${bbox}&results=64&duration=20&frames=1&polylines=false`);
     const data=await r.json();
     const vehicles=data.movements||[];
 

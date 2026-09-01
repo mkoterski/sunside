@@ -1,4 +1,4 @@
-# SunSide Berlin - v0.15
+# SunSide Berlin - v0.16
 
 **Status:** DEVELOPMENT
 **Versioning:** `v0.x` = development/testing, `v1.x` = production-ready
@@ -133,6 +133,17 @@ History before v0.10 predates the numbering and is archived by date.
 ### Changelog
 
 ```
+v0.16  2026-09-01  Fixed: during a VBB outage the app hung on the loading
+                   screen indefinitely, which on a phone reads as "app broken".
+                   Root cause: no timeout anywhere in the chain - a downed VBB
+                   stalls connections rather than refusing them, the Worker
+                   waited on it forever and the client waited on the Worker.
+                   Now the Worker aborts upstream after 8s (then serves stale
+                   cache or an honest 502) and every client API call aborts
+                   after 12s; a 5xx or timeout shows a new honest "data source
+                   is down, try again in a few minutes" state in both languages
+                   instead of blaming the user's connection.
+
 v0.15  2026-09-01  F3 landed - v2A part 2, follow-the-ride: a journey screen
                    off the verdict. Dark status card (stop n of m, current
                    segment, shade side, clock-estimate vs live-GPS badge),
@@ -230,8 +241,10 @@ The PoC and the future share one diagram -
 The community-run `v6.vbb.transport.rest` wraps an unofficial VBB endpoint -
 great for a hobby PoC, not official or guaranteed. Be a good neighbour: the
 proxy exists partly so this project does not hammer that shared instance.
-It also has real outages (one observed 2026-09-01); the Worker then serves
-stale cache when it has any, and the app shows its error state when it does not.
+It also has real outages (three observed on 2026-09-01 alone). During one the
+Worker aborts the upstream call after 8s and serves stale cache when it has
+any; the app fails fast to an honest "data source is down" state when it does
+not.
 
 ## License
 
@@ -243,7 +256,7 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.15`, DEVELOPMENT. The full loop works end to end against live
+Prototype, `v0.16`, DEVELOPMENT. The full loop works end to end against live
 data: departures → exit stop → verdict with route spine and shade meter →
 follow-the-ride, with live radar, the best-departure finder and opt-in
 encrypted history, in German and English, deployed at the URL above. Verified
