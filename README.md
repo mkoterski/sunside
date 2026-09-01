@@ -9,6 +9,8 @@ you get off, and the app answers with one sentence: sit on the left, or the
 right. Mobile-first single-page app backed by an edge-cached proxy in front of
 the public VBB API, sized for **10-100 concurrent users at zero cost**.
 
+**Try it:** https://sunside-berlin.mkoterski.workers.dev
+
 ## Why it is built like this
 
 - **One canonical client.** `public/index.html` holds the whole SPA - markup,
