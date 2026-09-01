@@ -125,6 +125,25 @@ header{
 .btn-ghost{background:var(--offset);color:var(--text)}
 .btn-ghost:hover{background:var(--border)}
 
+/* ── Encrypted history card (F2) ── */
+.hist-card{width:100%;max-width:360px;margin-top:var(--sp5);text-align:left}
+.hist-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:var(--sp4)}
+.hist-hdr{display:flex;align-items:center;justify-content:space-between;gap:var(--sp2);margin-bottom:var(--sp3)}
+.hist-title{font-size:var(--xs);font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.hist-actions{display:flex;gap:var(--sp2)}
+.hist-link{font-size:var(--xs);color:var(--accent);font-weight:700;padding:var(--sp1) var(--sp2);border-radius:var(--r-sm)}
+.hist-input{width:100%;background:var(--offset);border:1px solid var(--border);border-radius:var(--r-md);
+  padding:var(--sp2) var(--sp3);font:inherit;font-size:var(--sm);color:var(--text);margin-bottom:var(--sp2)}
+.hist-input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.hist-note{font-size:var(--xs);color:var(--faint);margin-top:var(--sp2)}
+.hist-err{font-size:var(--xs);color:var(--accent);font-weight:700;margin-top:var(--sp2)}
+.hist-trip{display:flex;align-items:center;gap:var(--sp2);padding:var(--sp2) 0;border-top:1px solid var(--border);font-size:var(--sm)}
+.hist-trip:first-of-type{border-top:none}
+.hist-trip .ht-line{font-weight:800;flex-shrink:0}
+.hist-trip .ht-route{color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent-tag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.04em;color:var(--accent);
+  background:var(--accent-bg);border-radius:var(--r-sm);padding:1px 6px;margin-left:6px;vertical-align:1px}
+
 /* ── Departure cards ── */
 .dep-list{display:flex;flex-direction:column;gap:var(--sp2)}
 .dep-card{
@@ -327,6 +346,9 @@ header{
       <span data-i18n="useLocation">Use my location</span>
     </button>
     <button class="btn btn-ghost" onclick="useDemo()">Demo - Hugenottenplatz, Berlin</button>
+    <!-- Encrypted local history (F2). Rendered entirely by renderHistCard();
+         states: no store yet / locked / unlocked. -->
+    <div class="hist-card" id="hist-card"></div>
   </div>
 </div>
 
@@ -377,6 +399,7 @@ header{
 </main>
 </div>
 
+<script src="history.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
 <script>
 // ── Theme ──────────────────────────────────────────────
@@ -449,6 +472,18 @@ de:{
   pctSun:'% Sonne', shadiest:'schattigste',
   error:'Fehler', startOver:'← Von vorn',
   langAria:'Sprache wechseln', themeAria:'Design wechseln',
+  histTitle:'Verlauf',
+  histIntro:'Merkt sich deine letzten Fahrten - nur auf diesem Gerät, verschlüsselt mit einer Passphrase deiner Wahl. Ohne Passphrase nicht lesbar, auch nicht von der App.',
+  histWarnNoReset:'Passphrase vergessen = Verlauf unwiederbringlich weg. Es gibt keinen Reset.',
+  histSetupBtn:'Verlauf aktivieren',
+  histUnlockBtn:'Entsperren',
+  histPassPlaceholder:'Passphrase',
+  histWrongPass:'Falsche Passphrase.',
+  histEmpty:'Noch keine Fahrten gespeichert. Jede berechnete Fahrt landet hier.',
+  histLock:'Sperren',
+  histClear:'Löschen',
+  histClearConfirm:'Verlauf komplett löschen? Das ist endgültig.',
+  histRecent:'zuletzt',
 },
 en:{
   azLabel:'az', elevLabel:'elev',
@@ -501,6 +536,18 @@ en:{
   pctSun:'% sun', shadiest:'shadiest',
   error:'Error', startOver:'← Start over',
   langAria:'Switch language', themeAria:'Toggle theme',
+  histTitle:'History',
+  histIntro:'Remembers your recent rides - on this device only, encrypted with a passphrase you choose. Unreadable without it, even by the app.',
+  histWarnNoReset:'Forgotten passphrase = history is gone for good. There is no reset.',
+  histSetupBtn:'Enable history',
+  histUnlockBtn:'Unlock',
+  histPassPlaceholder:'Passphrase',
+  histWrongPass:'Wrong passphrase.',
+  histEmpty:'No trips saved yet. Every computed ride lands here.',
+  histLock:'Lock',
+  histClear:'Clear',
+  histClearConfirm:'Delete the whole history? This is final.',
+  histRecent:'recent',
 }};
 let lang=(function(){try{const s=localStorage.getItem('sunside/lang');if(s==='de'||s==='en')return s}catch(e){}return 'de'})();
 function t(key){return STR[lang][key]}
@@ -515,12 +562,83 @@ function applyLang(){
   lbtn.textContent=lang.toUpperCase();
   lbtn.setAttribute('aria-label',t('langAria'));
   document.getElementById('theme-toggle').setAttribute('aria-label',t('themeAria'));
+  renderHistCard();
   const active=document.querySelector('.screen.active')?.id;
   if(active==='scr-deps'&&allDeps.length){renderDeps(allDeps);setLocLabel()}
   if(active==='scr-stops'&&selDep){renderJourneyCard();renderVehicleStrip(radarVehicle);renderStops(selTrip)}
   if(active==='scr-result'&&selStops){calcSun(selStopIdx,selStops,selDepChosen)}
 }
 document.getElementById('lang-toggle').addEventListener('click',()=>{lang=lang==='de'?'en':'de';applyLang()});
+
+// ── Encrypted history (F2) ─────────────────────────────
+// Wraps public/history.js (zero-knowledge, passphrase-gated; see
+// docs/encrypted-history.md for the threat model). `hist` is null when the
+// environment lacks localStorage or Web Crypto - the card simply stays empty.
+// `histTrips` mirrors the decrypted trips while unlocked, so render functions
+// can tag matches synchronously.
+let hist=null, histTrips=[];
+try{hist=makeHistory()}catch(e){console.warn('history unavailable:',e.message)}
+
+function histMatches(line,dir){
+  return histTrips.some(h=>h.line===line&&h.dir===dir);
+}
+function recentTag(){return `<span class="recent-tag">${t('histRecent')}</span>`}
+
+function renderHistCard(){
+  const box=document.getElementById('hist-card');
+  if(!box)return;
+  if(!hist){box.innerHTML='';return}
+  const hdr=(actions)=>`<div class="hist-hdr"><span class="hist-title">${t('histTitle')}</span>${actions||''}</div>`;
+  if(hist.isUnlocked()){
+    const list=histTrips.length
+      ?histTrips.map(h=>`<div class="hist-trip"><span class="ht-line">${esc(h.line)}</span><span class="ht-route">${esc(h.from)} → ${esc(h.to)}</span></div>`).join('')
+      :`<div class="hist-note">${t('histEmpty')}</div>`;
+    box.innerHTML=`<div class="hist-box">
+      ${hdr(`<span class="hist-actions">
+        <button class="hist-link" onclick="histLockNow()">${t('histLock')}</button>
+        <button class="hist-link" onclick="histClearNow()">${t('histClear')}</button>
+      </span>`)}
+      ${list}</div>`;
+  } else {
+    const firstTime=!hist.exists();
+    box.innerHTML=`<div class="hist-box">
+      ${hdr()}
+      ${firstTime?`<div class="hist-note" style="margin:0 0 var(--sp2)">${t('histIntro')}</div>`:''}
+      <input class="hist-input" type="password" id="hist-pass" placeholder="${t('histPassPlaceholder')}"
+        autocomplete="off" onkeydown="if(event.key==='Enter')histSetupOrUnlock()">
+      <button class="btn btn-ghost" style="font-size:var(--xs);padding:var(--sp2) var(--sp4)" onclick="histSetupOrUnlock()">
+        ${firstTime?t('histSetupBtn'):t('histUnlockBtn')}</button>
+      ${firstTime?`<div class="hist-note">${t('histWarnNoReset')}</div>`:''}
+      <div class="hist-err" id="hist-err"></div></div>`;
+  }
+}
+
+async function histSetupOrUnlock(){
+  const input=document.getElementById('hist-pass');
+  const pass=input?.value||'';
+  if(!pass)return;
+  const ok=await hist.unlock(pass);
+  if(!ok){document.getElementById('hist-err').textContent=t('histWrongPass');return}
+  histTrips=await hist.getTrips();
+  renderHistCard();
+}
+function histLockNow(){hist.lock();histTrips=[];renderHistCard()}
+function histClearNow(){
+  if(!confirm(t('histClearConfirm')))return;
+  hist.clear();histTrips=[];renderHistCard();
+}
+// Fire-and-forget save after a verdict. Never let a history failure break the
+// result screen - this is a convenience, not a dependency.
+function histSaveTrip(dep,fromStop,toStop){
+  if(!hist||!hist.isUnlocked())return;
+  (async()=>{
+    try{
+      await hist.addTrip({line:dep.line?.name||'?',dir:dep.direction||'?',from:fromStop.name,to:toStop.name,ts:Date.now()});
+      if(fromStop.lat!=null)await hist.addStop({name:fromStop.name,lat:fromStop.lat,lon:fromStop.lon});
+      histTrips=await hist.getTrips();
+    }catch(e){console.warn('history save failed:',e.message)}
+  })();
+}
 
 // ── State ──────────────────────────────────────────────
 // API base is configurable. By default it points at the local proxy path "/api",
@@ -531,7 +649,7 @@ document.getElementById('lang-toggle').addEventListener('click',()=>{lang=lang==
 // directly. Testing-only: that path shares VBB's global 100 req/min bucket.
 const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
   ||(typeof location!=='undefined'&&location.hostname.endsWith('github.io')?'https://v6.vbb.transport.rest':'/api');
-console.log('SunSide Berlin v0.12 - API base:',API);
+console.log('SunSide Berlin v0.13 - API base:',API);
 let uLat=null,uLon=null;
 let allDeps=[];
 let selDep=null;
@@ -637,7 +755,7 @@ function renderDeps(deps){
     <div class="dep-card anim" style="animation-delay:${i*35}ms" onclick="selectDep(${i})">
       <div class="line-badge ${badgeClass(prod)}">${esc(name)}</div>
       <div class="dep-info">
-        <div class="dep-dest">${esc(dest)}</div>
+        <div class="dep-dest">${esc(dest)}${histMatches(name,dest)?recentTag():''}</div>
         <div class="dep-stop">${t('fromStop')(esc(d._sName))}</div>
         ${liveTag}${delayTag}
       </div>
@@ -776,6 +894,10 @@ function renderStops(trip){
   }
   if(!stops.length)stops=[{id:'dest',name:selDep.direction||'Final stop',arrival:null}];
 
+  // Tag the exit stop of a remembered ride on this line+direction (F2).
+  const recentTo=new Set(histTrips
+    .filter(h=>h.line===(selDep.line?.name||'?')&&h.dir===(selDep.direction||'?'))
+    .map(h=>h.to));
   list.innerHTML=stops.map((s,i)=>{
     // `tm`, not `t` - a local `t` here would shadow the translation function.
     const tm=s.arrival?new Date(s.arrival).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'';
@@ -783,7 +905,7 @@ function renderStops(trip){
     return `
     <div class="stop-item ${disabled}" onclick="calcSun(${i},${JSON.stringify(stops).replace(/"/g,'&quot;')})">
       <div class="sdot ${i===0?'origin':''}"></div>
-      <div class="stop-name">${esc(s.name)}${i===0?` <span style="color:var(--accent);font-size:var(--xs)">${t('boardingHere')}</span>`:''}</div>
+      <div class="stop-name">${esc(s.name)}${i===0?` <span style="color:var(--accent);font-size:var(--xs)">${t('boardingHere')}</span>`:i>0&&recentTo.has(s.name)?recentTag():''}</div>
       ${tm?`<div class="stop-time">${tm}</div>`:''}
     </div>`;
   }).join('');
@@ -913,6 +1035,7 @@ function calcSun(stopIdx, stops, dep){
 
   renderResult(trainBearing,sunAz,sunEl,dest,stops[0],bearingSource,flipStop);
   renderDepartureFinder();
+  histSaveTrip(dep,stops[0],dest);
   show('scr-result');
 }
 

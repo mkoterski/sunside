@@ -1,13 +1,13 @@
 {
   "name": "sunside-berlin",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "private": true,
   "description": "SunSide Berlin PoC - edge-cached VBB proxy + SPA on Cloudflare Workers free tier",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
-    "test": "node test/sun-side.test.mjs"
+    "test": "node test/sun-side.test.mjs && node test/history.test.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.68.0"

@@ -1,8 +1,11 @@
-# Encrypted local history (`history.js`)
+# Encrypted local history (`public/history.js`)
 
 A zero-knowledge, passphrase-gated store for SunSide's recent **stops** and **trips**.
 Everything stays on the device, encrypted; nothing is transmitted. This keeps the app's
 privacy posture intact while adding a "recently used" convenience.
+
+Integrated into the app since v0.13 (F2): an opt-in card on the start screen, a save on
+every verdict, "recent" tags on matching departures and exit stops.
 
 ## What it is
 
@@ -72,6 +75,7 @@ the strongest minimization position; it should be reflected as such in your Art.
 
 ## Tested
 
-Verified (18 assertions): empty-init, round-trip across sessions, wrong-passphrase rejection,
-no-plaintext-in-storage, dedup, cap at 12, locked-ops-throw, full wipe, and the PBKDF2
-iteration floor.
+`test/history.test.mjs` (22 assertions, part of `npm test`) imports the real module with
+stubbed storage and Node's WebCrypto: empty-init, round-trip across sessions,
+wrong-passphrase rejection, no-plaintext-in-storage, dedup, cap at 12, locked-ops-throw,
+full wipe including the salt, and the PBKDF2 iteration floor.

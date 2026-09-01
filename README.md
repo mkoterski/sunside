@@ -1,4 +1,4 @@
-# SunSide Berlin - v0.12
+# SunSide Berlin - v0.13
 
 **Status:** DEVELOPMENT
 **Versioning:** `v0.x` = development/testing, `v1.x` = production-ready
@@ -16,12 +16,12 @@ the public VBB API, sized for **10-100 concurrent users at zero cost**.
 | | |
 |---|---|
 | `public/index.html` | the SPA - THIS is the canonical, deployed app |
+| `public/history.js` | encrypted local journey history (F2); see [`docs/encrypted-history.md`](docs/encrypted-history.md) |
 | `worker/src/index.js` | Cloudflare Worker: caching proxy + single-flight + budget |
-| `test/sun-side.test.mjs` | pure-logic tests for the bearing / sun-side maths |
+| `test/` | pure-logic tests: sun-side maths, history module crypto |
 | `wrangler.toml` | one Worker serves BOTH the SPA and `/api/*` |
 | `prototypes/` | numbered self-contained offline prototypes; `prototypes/index.html` is the hub |
-| `lib/encrypted-history/` | standalone encrypted journey-history module, not yet integrated (F2) |
-| `docs/` | design brief and supporting notes |
+| `docs/` | design brief, encrypted-history threat model, supporting notes |
 
 `prototypes/` (010-015) are exploratory builds, one folder each, every one a
 single `index.html` that opens directly in any browser - no server, no API. Only
@@ -46,11 +46,13 @@ bug), add one line before the main script in `public/index.html`:
 ### Tests
 
 ```bash
-node test/sun-side.test.mjs
+npm test
 ```
 
-Covers the bearing maths and sun-side classification, including a curved-route
-flip scenario. Should pass before any commit.
+Two suites, no dependencies: the bearing maths and sun-side classification
+(including a curved-route flip scenario), and the encrypted history module
+(round-trip, wrong-passphrase rejection, no plaintext at rest, dedup, cap,
+wipe, KDF floor). Should pass before any commit.
 
 ## Deploy
 
@@ -113,6 +115,7 @@ Worker - but two things still work:
 | Best-departure finder | Ranks the next departures of the same line by sun exposure - and says honestly when they barely differ |
 | Theme | Light/dark toggle |
 | Language | DE/EN toggle in the header, German default, persisted in `localStorage`. Static markup re-applies via `data-i18n`; the active screen re-renders, so nothing on screen stays behind |
+| History | Opt-in, passphrase-gated, encrypted journey history - device-only, zero-knowledge at rest (AES-GCM, PBKDF2). Each verdict saves the ride; matching departures and the remembered exit stop get a "recent" tag. Lock and clear controls on the card; forgotten passphrase = gone, by design. See [`docs/encrypted-history.md`](docs/encrypted-history.md) |
 | Favicon | The app's concept as a mark - a sun half and a shade half. Inline SVG data URI, no icon asset to ship |
 
 ## Versioning and changelog
@@ -127,6 +130,15 @@ History before v0.10 predates the numbering and is archived by date.
 ### Changelog
 
 ```
+v0.13  2026-09-01  F2 landed: the encrypted history module is integrated. The
+                   start screen gets an opt-in card (set passphrase / unlock /
+                   lock / clear); every verdict saves the ride; matching
+                   departures and the remembered exit stop show a "recent"
+                   tag. Module moved lib/ → public/history.js so it deploys;
+                   its doc moved to docs/encrypted-history.md. Its README
+                   claimed 18 test assertions that were not in the repo -
+                   test/history.test.mjs now holds 22, wired into npm test.
+
 v0.12  2026-09-01  Repo tidy-up, no behavior change: misc/ renamed to docs/,
                    privacy/ renamed to lib/encrypted-history/ (it is a module,
                    not a topic), README reordered so getting started comes
@@ -164,9 +176,7 @@ one when an item lands.
 
 ### Planned features
 
-| ID | Pri | Item | Notes |
-|---|---|---|---|
-| F2 | P3 | Integrate the encrypted history module | [`lib/encrypted-history/`](lib/encrypted-history/README.md) is finished, documented standalone code (AES-GCM, PBKDF2, zero-knowledge at rest) that nothing imports yet. Wiring it in would give a "recently used" list without touching the privacy posture. |
+Nothing open right now.
 
 ### Settled
 
@@ -175,6 +185,7 @@ Decided or built, kept here so the IDs are not reused.
 | ID | Settled | Decision |
 |---|---|---|
 | F1 | 2026-09-01 | Landed in v0.11 as a DE/EN toggle in the header, German default, persisted in `localStorage`. |
+| F2 | 2026-09-01 | Landed in v0.13: encrypted history integrated as an opt-in card on the start screen, saves on every verdict, surfaces "recent" tags. One honest caveat from the module's own threat model stands: the app is one inline script, so the CSP hardening the module recommends against XSS is not in place yet - the encryption at rest is real either way. |
 
 ### Architecture upgrades
 
@@ -207,7 +218,8 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.12`, DEVELOPMENT. The full loop works end to end against live
-data: departures → exit stop → verdict, with live radar and the best-departure
-finder, in German and English, deployed at the URL above. Verified in one
-desktop browser; design work is the next planned step.
+Prototype, `v0.13`, DEVELOPMENT. The full loop works end to end against live
+data: departures → exit stop → verdict, with live radar, the best-departure
+finder and opt-in encrypted history, in German and English, deployed at the
+URL above. Verified in one desktop browser; design work is the next planned
+step.
