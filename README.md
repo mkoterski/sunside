@@ -9,7 +9,7 @@ you get off, and the app answers with one sentence: sit on the left, or the
 right. Mobile-first single-page app backed by an edge-cached proxy in front of
 the public VBB API, sized for **10-100 concurrent users at zero cost**.
 
-**Try it:** https://sunside-berlin.mkoterski.workers.dev
+**Try it:** [sunside-berlin.mkoterski.workers.dev](https://sunside-berlin.mkoterski.workers.dev)
 
 ## Repository layout
 
@@ -72,9 +72,9 @@ Deploys are manual: a `git push` updates GitHub Pages, not the Worker.
 Worker - but two things still work:
 
 - The **prototypes** are fully offline and run on Pages as-is:
-  https://mkoterski.github.io/sunside/prototypes/
+  [mkoterski.github.io/sunside/prototypes](https://mkoterski.github.io/sunside/prototypes/)
 - The **app** detects a `github.io` host and falls back to calling VBB
-  directly: https://mkoterski.github.io/sunside/public/. Fine for personal
+  directly: [mkoterski.github.io/sunside/public](https://mkoterski.github.io/sunside/public/). Fine for personal
   testing; it spends the shared 100 req/min bucket the proxy exists to
   protect, so anything beyond that goes through the Worker.
 
