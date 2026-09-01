@@ -142,7 +142,18 @@ Pre-versioning history, by date.
 
 ## Roadmap
 
-Deliberately not built yet. The PoC and the future share one diagram -
+Deliberately not built yet. The IDs are stable, so a changelog entry can quote
+one when an item lands.
+
+### Planned features
+
+| ID | Pri | Item | Notes |
+|---|---|---|---|
+| F1 | P2 | DE/EN language toggle | All copy is currently English, hardcoded in markup and JS strings. A toggle next to the theme one; German should be the default, since the riders are in Berlin. |
+
+### Architecture upgrades
+
+The PoC and the future share one diagram -
 `client -> edge cache -> data source` - and each box upgrades in place:
 
 - Swap `UPSTREAM` for a self-hosted `vbb-rest` instance to drop the
