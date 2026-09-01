@@ -1,4 +1,4 @@
-# SunSide Berlin - v0.10
+# SunSide Berlin - v0.11
 
 **Status:** DEVELOPMENT
 **Versioning:** `v0.x` = development/testing, `v1.x` = production-ready
@@ -62,6 +62,8 @@ single `index.html` that opens directly in any browser - no server, no API. Only
 | Live radar | The actual vehicle's GPS position via VBB radar; its live bearing is preferred on single-leg rides |
 | Best-departure finder | Ranks the next departures of the same line by sun exposure - and says honestly when they barely differ |
 | Theme | Light/dark toggle |
+| Language | DE/EN toggle in the header, German default, persisted in `localStorage`. Static markup re-applies via `data-i18n`; the active screen re-renders, so nothing on screen stays behind |
+| Favicon | The app's concept as a mark - a sun half and a shade half. Inline SVG data URI, no icon asset to ship |
 
 ## Running locally
 
@@ -123,6 +125,13 @@ History before v0.10 predates the numbering and is archived by date.
 ### Changelog
 
 ```
+v0.11  2026-09-01  F1 landed: DE/EN toggle in the header, German default,
+                   persisted. All copy moved into one STR dictionary per
+                   language, written as native copy. Added the favicon.
+                   Fixed (caught in verification): a local `const t` in two
+                   render functions shadowed the translation function t(),
+                   so the stop list threw on render.
+
 v0.10  2026-09-01  Adopted NXW versioning; rewrote this README. Fixed: the
                    exit-stop list never rendered - v6 wraps /trips payloads as
                    {trip:{...}} but the client read stopovers off the top
@@ -147,9 +156,15 @@ one when an item lands.
 
 ### Planned features
 
-| ID | Pri | Item | Notes |
-|---|---|---|---|
-| F1 | P2 | DE/EN language toggle | All copy is currently English, hardcoded in markup and JS strings. A toggle next to the theme one; German should be the default, since the riders are in Berlin. |
+Nothing open right now.
+
+### Settled
+
+Decided or built, kept here so the IDs are not reused.
+
+| ID | Settled | Decision |
+|---|---|---|
+| F1 | 2026-09-01 | Landed in v0.11 as a DE/EN toggle in the header, German default, persisted in `localStorage`. |
 
 ### Architecture upgrades
 
@@ -180,7 +195,7 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.10`, DEVELOPMENT. As of the v0.10 fix the full loop works end to
+Prototype, `v0.11`, DEVELOPMENT. As of the v0.10 fix the full loop works end to
 end against live data: departures → exit stop → verdict, with live radar and
 the best-departure finder. Verified in one desktop browser; design work is the
 next planned step, on top of a client that actually works.

@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>SunSide Berlin</title>
+<!-- Favicon: the app's concept as a mark - a sun half and a shade half. Inline
+     SVG data URI, so there is no icon asset to ship. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23f7a600'/%3E%3Cpath d='M32 0h18a14 14 0 0 1 14 14v36a14 14 0 0 1-14 14H32z' fill='%231e293b'/%3E%3Ccircle cx='16' cy='32' r='9' fill='%23fff7e6'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
@@ -292,6 +295,7 @@ header{
     Sun<em>Side</em>
   </div>
   <div class="hdr-right">
+    <button class="icon-btn" id="lang-toggle" aria-label="Sprache wechseln" style="font-size:11px;font-weight:700;letter-spacing:.02em">DE</button>
     <button class="icon-btn" id="theme-toggle" aria-label="Toggle theme">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
     </button>
@@ -301,9 +305,9 @@ header{
 <!-- Sun bar -->
 <div id="sun-bar">
   <div class="sun-dot"></div>
-  <span><span class="sb-val" id="sb-az">-</span> az</span>
+  <span><span class="sb-val" id="sb-az">-</span> <span data-i18n="azLabel">az</span></span>
   <div class="sb-sep"></div>
-  <span><span class="sb-val" id="sb-el">-</span> elev</span>
+  <span><span class="sb-val" id="sb-el">-</span> <span data-i18n="elevLabel">elev</span></span>
   <div class="sb-sep"></div>
   <span><span class="sb-val" id="sb-dir">-</span></span>
   <div class="sb-sep"></div>
@@ -316,11 +320,11 @@ header{
 <div class="screen active" id="scr-perm">
   <div class="state-view anim">
     <div class="sv-icon">📍</div>
-    <h2>Where are you?</h2>
-    <p>SunSide finds departures nearby and tells you which seat stays in the shade.</p>
+    <h2 data-i18n="permTitle">Where are you?</h2>
+    <p data-i18n="permText">SunSide finds departures nearby and tells you which seat stays in the shade.</p>
     <button class="btn btn-primary" onclick="requestLocation()">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-      Use my location
+      <span data-i18n="useLocation">Use my location</span>
     </button>
     <button class="btn btn-ghost" onclick="useDemo()">Demo - Hugenottenplatz, Berlin</button>
   </div>
@@ -329,7 +333,7 @@ header{
 <!-- SCREEN: loading -->
 <div class="screen" id="scr-load">
   <div class="section">
-    <div class="sec-hdr"><span class="sec-title">Finding departures…</span></div>
+    <div class="sec-hdr"><span class="sec-title" data-i18n="finding">Finding departures…</span></div>
     <div class="skel-card skel"></div>
     <div class="skel-card skel"></div>
     <div class="skel-card skel"></div>
@@ -342,10 +346,10 @@ header{
   <div class="section">
     <div class="sec-hdr">
       <div>
-        <div class="sec-title">Nearby departures</div>
+        <div class="sec-title" data-i18n="nearbyDeps">Nearby departures</div>
         <div class="sec-sub" id="loc-label">-</div>
       </div>
-      <button class="refresh-btn" onclick="doRefresh()">↻ Refresh</button>
+      <button class="refresh-btn" onclick="doRefresh()" data-i18n="refresh">↻ Refresh</button>
     </div>
     <div class="dep-list" id="dep-list"></div>
   </div>
@@ -354,10 +358,10 @@ header{
 <!-- SCREEN: stop picker -->
 <div class="screen" id="scr-stops">
   <div class="section">
-    <button class="back-btn" onclick="show('scr-deps')">← Back</button>
+    <button class="back-btn" onclick="show('scr-deps')" data-i18n="back">← Back</button>
     <div class="journey-card anim" id="jc-card"></div>
     <div id="veh-strip-wrap"></div>
-    <div class="stops-label">Where do you get off?</div>
+    <div class="stops-label" data-i18n="whereOff">Where do you get off?</div>
     <div class="stops-list" id="stops-list"></div>
   </div>
 </div>
@@ -365,7 +369,7 @@ header{
 <!-- SCREEN: result -->
 <div class="screen" id="scr-result">
   <div class="section">
-    <button class="back-btn" onclick="show('scr-stops')">← Choose different stop</button>
+    <button class="back-btn" onclick="show('scr-stops')" data-i18n="diffStop">← Choose different stop</button>
     <div id="result-wrap" class="anim"></div>
   </div>
 </div>
@@ -388,6 +392,136 @@ header{
     :'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>'}
 })();
 
+// ── Language (F1) ──────────────────────────────────────
+// German default - the riders are in Berlin. One dictionary per language,
+// written as native copy rather than translation. Static markup is re-applied
+// via [data-i18n]; dynamic renders read STR at render time and the active
+// screen is re-rendered on toggle, so nothing on screen stays behind.
+const STR={
+de:{
+  azLabel:'az', elevLabel:'Höhe',
+  permTitle:'Wo bist du?',
+  permText:'SunSide findet Abfahrten in deiner Nähe und sagt dir, welche Seite im Schatten bleibt.',
+  useLocation:'Meinen Standort verwenden',
+  finding:'Suche Abfahrten…',
+  nearbyDeps:'Abfahrten in der Nähe',
+  refresh:'↻ Aktualisieren',
+  back:'← Zurück',
+  whereOff:'Wo steigst du aus?',
+  diffStop:'← Andere Haltestelle wählen',
+  locDenied:'Standort abgelehnt - Demo wird verwendet.',
+  noStopsNearby:'Keine Haltestellen in der Nähe gefunden.',
+  loadFailed:'Laden fehlgeschlagen. Prüfe deine Verbindung.',
+  stopsWithin:n=>`${n} Haltestellen im Umkreis von 700 m`,
+  noDeps:'Keine Abfahrten',
+  noDepsText:'In den nächsten 35 Minuten fährt hier nichts ab.',
+  fromStop:s=>`ab ${s}`,
+  now:'jetzt',
+  prodTrain:'Zug',
+  departs:(t,s)=>`Abfahrt ${t} ab ${s}`,
+  vehicleLocated:d=>`<strong>Fahrzeug geortet</strong> - ${d} entfernt`,
+  liveGps:'Live-GPS-Position via VBB-Radar',
+  boardingHere:'(Einstieg)',
+  sideWord:{left:'linke',right:'rechte'},
+  noSun:'Keine direkte Sonne 🌙',
+  noSunText:'Die Sonne ist unter dem Horizont. Beide Seiten sind gleich angenehm.',
+  lowSun:'Sonne sehr tief ⚠️',
+  lowSunText:(el,side)=>`Bei nur ${el}° Höhe scheint die Sonne tief ins Fahrzeug. Die ${side} Seite ist stärker betroffen - die Schattenseite gewinnt trotzdem.`,
+  sunAhead:'Sonne direkt voraus',
+  sunAheadText:'Die Sonne steht genau in Fahrtrichtung. Mittlere Plätze oder der Gang minimieren die Sonne.',
+  sitLeft:'LINKS sitzen ←', sitRight:'RECHTS sitzen →',
+  sitText:(az,card,el,struck,shade)=>`Sonne steht bei ${az}° (${card}) auf ${el}° Höhe - trifft die ${struck} Seite. Die ${shade} Seite bleibt im Schatten.`,
+  sunBehind:'Egal wo - Sonne im Rücken',
+  sunBehindText:'Die Sonne steht hinter dem Fahrzeug. Beide Seiten bekommen kaum direkte Sonne.',
+  warnLow:el=>`Tiefe Sonne (${el}°) kann über die Sitzlehnen hinweg scheinen. Schattenseite trotzdem empfohlen.`,
+  flipNote:at=>`Die Schattenseite wechselt etwa bei ${at}. Die Empfehlung gilt für den längsten Teil der Fahrt.`,
+  radarNote:'Fahrtrichtung aus <strong>Live-Fahrzeug-GPS</strong> - genauestes Ergebnis.',
+  lblLine:'Linie', lblExit:'Ausstieg', lblHeading:'Fahrtrichtung',
+  lblAz:'Sonnen-Azimut', lblEl:'Sonnenhöhe', lblRel:'Relativer Sonnenwinkel',
+  rightWindow:'rechtes Fenster', leftWindow:'linkes Fenster',
+  src:{estimated:'geschätzt',segments:n=>`${n} Streckenabschnitte`,stopCoords:'Halte-Koordinaten',liveGps:'Live-Fahrzeug-GPS',userDest:'Standort → Ziel',fallback:'Notschätzung'},
+  backToDeps:'← Zurück zu den Abfahrten',
+  dirTravel:'→ Fahrtrichtung',
+  seatLeft:'Linke Seite', seatRight:'Rechte Seite',
+  finderHdr:'Etwas später fahren?',
+  finderSunDown:'Die Sonne ist bei allen unten - jede Abfahrt ist gleich angenehm, nimm einfach die nächste.',
+  finderSimilar:'Gerade alle ähnlich - der Schatten ändert sich zwischen diesen Abfahrten kaum. Nimm die, die passt.',
+  pctSun:'% Sonne', shadiest:'schattigste',
+  error:'Fehler', startOver:'← Von vorn',
+  langAria:'Sprache wechseln', themeAria:'Design wechseln',
+},
+en:{
+  azLabel:'az', elevLabel:'elev',
+  permTitle:'Where are you?',
+  permText:'SunSide finds departures nearby and tells you which seat stays in the shade.',
+  useLocation:'Use my location',
+  finding:'Finding departures…',
+  nearbyDeps:'Nearby departures',
+  refresh:'↻ Refresh',
+  back:'← Back',
+  whereOff:'Where do you get off?',
+  diffStop:'← Choose different stop',
+  locDenied:'Location denied - using demo.',
+  noStopsNearby:'No stops found nearby.',
+  loadFailed:'Failed to load. Check connection.',
+  stopsWithin:n=>`${n} stops within 700 m`,
+  noDeps:'No departures',
+  noDepsText:'Nothing departing nearby in the next 35 min.',
+  fromStop:s=>`from ${s}`,
+  now:'now',
+  prodTrain:'Train',
+  departs:(t,s)=>`departs ${t} from ${s}`,
+  vehicleLocated:d=>`<strong>Vehicle located</strong> - ${d} away`,
+  liveGps:'Live GPS position via VBB radar',
+  boardingHere:'(boarding here)',
+  sideWord:{left:'left',right:'right'},
+  noSun:'No direct sun 🌙',
+  noSunText:'The sun is below the horizon. Both sides are equally comfortable.',
+  lowSun:'Sun very low ⚠️',
+  lowSunText:(el,side)=>`At only ${el}° elevation the sun can penetrate deeply. The ${side} side has more exposure - but shade side still wins.`,
+  sunAhead:'Sun straight ahead',
+  sunAheadText:'The sun is directly in the direction of travel. Central seats or the aisle minimise exposure.',
+  sitLeft:'Sit on the LEFT ←', sitRight:'Sit on the RIGHT →',
+  sitText:(az,card,el,struck,shade)=>`Sun is ${az}° (${card}) at ${el}° - hitting the ${struck} side. ${shade[0].toUpperCase()+shade.slice(1)} side stays in shade.`,
+  sunBehind:'Any seat - sun behind',
+  sunBehindText:'The sun is behind the train. Both sides receive minimal direct sunlight.',
+  warnLow:el=>`Low sun angle (${el}°) can reach past seat backs. Shade side still recommended.`,
+  flipNote:at=>`The shaded side changes around ${at}. Recommendation below is for the longest part of your ride.`,
+  radarNote:'Train bearing from <strong>live vehicle GPS</strong> - most accurate result.',
+  lblLine:'Line', lblExit:'Exit stop', lblHeading:'Train heading',
+  lblAz:'Sun azimuth', lblEl:'Sun elevation', lblRel:'Relative sun angle',
+  rightWindow:'right window', leftWindow:'left window',
+  src:{estimated:'estimated',segments:n=>`${n} stop segments`,stopCoords:'stop coordinates',liveGps:'live vehicle GPS',userDest:'user → destination',fallback:'fallback estimate'},
+  backToDeps:'← Back to departures',
+  dirTravel:'→ direction of travel',
+  seatLeft:'Left side', seatRight:'Right side',
+  finderHdr:'Leave a bit later?',
+  finderSunDown:'The sun is down for all of these — every departure is equally comfortable, so just take the next one.',
+  finderSimilar:'All similar right now — the shade barely changes across these departures. Take whichever is convenient.',
+  pctSun:'% sun', shadiest:'shadiest',
+  error:'Error', startOver:'← Start over',
+  langAria:'Switch language', themeAria:'Toggle theme',
+}};
+let lang=(function(){try{const s=localStorage.getItem('sunside/lang');if(s==='de'||s==='en')return s}catch(e){}return 'de'})();
+function t(key){return STR[lang][key]}
+
+// Re-apply every static string, then re-render whatever screen is active so
+// dynamic content follows immediately instead of on the next interaction.
+function applyLang(){
+  document.documentElement.lang=lang;
+  try{localStorage.setItem('sunside/lang',lang)}catch(e){}
+  document.querySelectorAll('[data-i18n]').forEach(el=>{el.textContent=t(el.dataset.i18n)});
+  const lbtn=document.getElementById('lang-toggle');
+  lbtn.textContent=lang.toUpperCase();
+  lbtn.setAttribute('aria-label',t('langAria'));
+  document.getElementById('theme-toggle').setAttribute('aria-label',t('themeAria'));
+  const active=document.querySelector('.screen.active')?.id;
+  if(active==='scr-deps'&&allDeps.length){renderDeps(allDeps);setLocLabel()}
+  if(active==='scr-stops'&&selDep){renderJourneyCard();renderVehicleStrip(radarVehicle);renderStops(selTrip)}
+  if(active==='scr-result'&&selStops){calcSun(selStopIdx,selStops,selDepChosen)}
+}
+document.getElementById('lang-toggle').addEventListener('click',()=>{lang=lang==='de'?'en':'de';applyLang()});
+
 // ── State ──────────────────────────────────────────────
 // API base is configurable. By default it points at the local proxy path "/api",
 // which the Cloudflare Worker serves (cache + single-flight in front of VBB).
@@ -397,7 +531,7 @@ header{
 // directly. Testing-only: that path shares VBB's global 100 req/min bucket.
 const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
   ||(typeof location!=='undefined'&&location.hostname.endsWith('github.io')?'https://v6.vbb.transport.rest':'/api');
-console.log('SunSide Berlin v0.10 - API base:',API);
+console.log('SunSide Berlin v0.11 - API base:',API);
 let uLat=null,uLon=null;
 let allDeps=[];
 let selDep=null;
@@ -433,7 +567,7 @@ function requestLocation(){
   show('scr-load');
   navigator.geolocation.getCurrentPosition(
     p=>{uLat=p.coords.latitude;uLon=p.coords.longitude;updateSunBar(uLat,uLon);loadDeps()},
-    ()=>{alert('Location denied - using demo.');useDemo()},
+    ()=>{alert(t('locDenied'));useDemo()},
     {timeout:10000,enableHighAccuracy:true}
   );
 }
@@ -452,8 +586,8 @@ async function loadDeps(){
     // cache keys at the proxy. This multiplies cache hit rate during clustering.
     const qLat=uLat.toFixed(3), qLon=uLon.toFixed(3);
     const nr=await fetch(`${API}/locations/nearby?latitude=${qLat}&longitude=${qLon}&distance=700&results=10`).then(r=>r.json());
-    if(!nr.length){showErr('No stops found nearby.');return}
-    document.getElementById('loc-label').textContent=`${nr.length} stops within 700 m`;
+    if(!nr.length){showErr(t('noStopsNearby'));return}
+    lastStopCount=nr.length;setLocLabel();
 
     // Fan out to 4 stops (was 6). At 4 deps/stop that is still plenty of choice
     // while cutting upstream load by a third per session.
@@ -476,8 +610,10 @@ async function loadDeps(){
     allDeps=deps.slice(0,14);
     renderDeps(allDeps);
     show('scr-deps');
-  }catch(e){console.error(e);showErr('Failed to load. Check connection.')}
+  }catch(e){console.error(e);showErr(t('loadFailed'))}
 }
+let lastStopCount=0;
+function setLocLabel(){document.getElementById('loc-label').textContent=t('stopsWithin')(lastStopCount)}
 
 function badgeClass(p){
   return p==='suburban'?'ls':p==='subway'?'lu':p==='tram'?'lt':p==='bus'?'lb':'lr';
@@ -485,14 +621,14 @@ function badgeClass(p){
 
 function renderDeps(deps){
   const el=document.getElementById('dep-list');
-  if(!deps.length){el.innerHTML='<div class="state-view"><div class="sv-icon">🚉</div><h2>No departures</h2><p>Nothing departing nearby in the next 35 min.</p></div>';return}
+  if(!deps.length){el.innerHTML=`<div class="state-view"><div class="sv-icon">🚉</div><h2>${t('noDeps')}</h2><p>${t('noDepsText')}</p></div>`;return}
   el.innerHTML=deps.map((d,i)=>{
     const prod=d.line?.product;
     const name=d.line?.name||'?';
     const dest=d.direction||'?';
     const when=new Date(d.when||d.plannedWhen);
     const mins=Math.round((when-Date.now())/60000);
-    const minsStr=mins<=0?'now':`${mins}′`;
+    const minsStr=mins<=0?t('now'):`${mins}′`;
     const timeStr=when.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
     const delay=d.delay?Math.round(d.delay/60):0;
     const delayTag=delay>0?`<div class="delay-tag">+${delay} min</div>`:'';
@@ -502,7 +638,7 @@ function renderDeps(deps){
       <div class="line-badge ${badgeClass(prod)}">${esc(name)}</div>
       <div class="dep-info">
         <div class="dep-dest">${esc(dest)}</div>
-        <div class="dep-stop">from ${esc(d._sName)}</div>
+        <div class="dep-stop">${t('fromStop')(esc(d._sName))}</div>
         ${liveTag}${delayTag}
       </div>
       <div class="dep-time-block">
@@ -518,22 +654,7 @@ async function selectDep(idx){
   selDep=allDeps[idx];
   radarVehicle=null;
   show('scr-load');
-
-  const prod=selDep.line?.product;
-  const name=selDep.line?.name||'?';
-  const prodLabel=prod==='suburban'?'S-Bahn':prod==='subway'?'U-Bahn':prod==='tram'?'Tram':prod==='bus'?'Bus':'Train';
-  const when=new Date(selDep.when||selDep.plannedWhen);
-  const timeStr=when.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
-
-  // Journey card
-  document.getElementById('jc-card').innerHTML=`
-    <div class="jc-top">
-      <div class="jc-badge ${badgeClass(prod)}">${esc(name)}</div>
-      <div class="jc-meta">
-        <h3>${esc(selDep.direction||'?')}</h3>
-        <p>${prodLabel} · departs ${timeStr} from ${esc(selDep._sName)}</p>
-      </div>
-    </div>`;
+  renderJourneyCard();
 
   // Fetch trip + radar + sibling departures in parallel. The sibling list (same
   // line/direction from the boarding stop) powers the best-departure finder; its
@@ -550,6 +671,22 @@ async function selectDep(idx){
   renderVehicleStrip(veh);
   renderStops(tripData);
   show('scr-stops');
+}
+
+function renderJourneyCard(){
+  const prod=selDep.line?.product;
+  const name=selDep.line?.name||'?';
+  const prodLabel=prod==='suburban'?'S-Bahn':prod==='subway'?'U-Bahn':prod==='tram'?'Tram':prod==='bus'?'Bus':t('prodTrain');
+  const when=new Date(selDep.when||selDep.plannedWhen);
+  const timeStr=when.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('jc-card').innerHTML=`
+    <div class="jc-top">
+      <div class="jc-badge ${badgeClass(prod)}">${esc(name)}</div>
+      <div class="jc-meta">
+        <h3>${esc(selDep.direction||'?')}</h3>
+        <p>${prodLabel} · ${t('departs')(timeStr,esc(selDep._sName))}</p>
+      </div>
+    </div>`;
 }
 
 async function fetchTrip(tripId){
@@ -615,8 +752,8 @@ function renderVehicleStrip(veh){
     <div class="veh-strip" style="margin-bottom:var(--sp4)">
       <div class="veh-icon">${prodIcon}</div>
       <div class="veh-text">
-        <div><strong>Vehicle located</strong> - ${distStr} away</div>
-        <div class="veh-ago">Live GPS position via VBB radar</div>
+        <div>${t('vehicleLocated')(distStr)}</div>
+        <div class="veh-ago">${t('liveGps')}</div>
       </div>
       <div class="live-badge"><div class="live-dot"></div>LIVE</div>
     </div>`;
@@ -640,13 +777,14 @@ function renderStops(trip){
   if(!stops.length)stops=[{id:'dest',name:selDep.direction||'Final stop',arrival:null}];
 
   list.innerHTML=stops.map((s,i)=>{
-    const t=s.arrival?new Date(s.arrival).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'';
+    // `tm`, not `t` - a local `t` here would shadow the translation function.
+    const tm=s.arrival?new Date(s.arrival).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'';
     const disabled=i===0?'disabled':'';
     return `
     <div class="stop-item ${disabled}" onclick="calcSun(${i},${JSON.stringify(stops).replace(/"/g,'&quot;')})">
       <div class="sdot ${i===0?'origin':''}"></div>
-      <div class="stop-name">${esc(s.name)}${i===0?' <span style="color:var(--accent);font-size:var(--xs)">(boarding here)</span>':''}</div>
-      ${t?`<div class="stop-time">${t}</div>`:''}
+      <div class="stop-name">${esc(s.name)}${i===0?` <span style="color:var(--accent);font-size:var(--xs)">${t('boardingHere')}</span>`:''}</div>
+      ${tm?`<div class="stop-time">${tm}</div>`:''}
     </div>`;
   }).join('');
 }
@@ -728,8 +866,8 @@ function calcSun(stopIdx, stops, dep){
   const legs=buildLegs(stops,stopIdx);
 
   let trainBearing=null;        // representative bearing for the display/diagram
-  let bearingSource='estimated';
-  let flipNote='';              // set when the shaded side changes mid-trip
+  let bearingSource={key:'estimated'}; // resolved into words at render time (i18n)
+  let flipStop='';              // set when the shaded side changes mid-trip
 
   if(legs.length){
     // Weight each leg's side by its length, pick the dominant non-neutral side.
@@ -742,7 +880,7 @@ function calcSun(stopIdx, stops, dep){
     // Representative bearing = the longest leg (most of the ride spent on it).
     const longest=legs.reduce((a,b)=>b.km>a.km?b:a,legs[0]);
     trainBearing=longest.bearing;
-    bearingSource=legs.length>1?`${legs.length} stop segments`:'stop coordinates';
+    bearingSource=legs.length>1?{key:'segments',n:legs.length}:{key:'stopCoords'};
 
     // Detect a flip: the recommended (shade) side changing between legs.
     const shadeOf=s=>s==='left'?'right':s==='right'?'left':null;
@@ -754,70 +892,70 @@ function calcSun(stopIdx, stops, dep){
         else if(reco!==firstReco&&flipAt===null){flipAt=legs[i].from;break;}
       }
     }
-    if(flipAt){
-      flipNote=`The shaded side changes around ${esc(flipAt)}. Recommendation below is for the longest part of your ride.`;
-    }
+    if(flipAt){flipStop=flipAt}
   }
 
   // Prefer live radar bearing only when there is essentially one straight leg,
   // since a single GPS heading can't represent a curved multi-segment ride.
   if(radarActive && radarVehicle?.bearing!=null && legs.length<=1){
     trainBearing=radarVehicle.bearing;
-    bearingSource='live vehicle GPS';
+    bearingSource={key:'liveGps'};
   }
 
   // Fallbacks when no usable stop geometry exists at all.
   if(trainBearing===null && dest.lat!=null && dest.lon!=null){
     trainBearing=bearing(uLat,uLon,dest.lat,dest.lon);
-    bearingSource='user → destination';
+    bearingSource={key:'userDest'};
   }
   if(trainBearing===null){
-    trainBearing=45;bearingSource='fallback estimate';
+    trainBearing=45;bearingSource={key:'fallback'};
   }
 
-  renderResult(trainBearing,sunAz,sunEl,dest,stops[0],bearingSource,flipNote);
+  renderResult(trainBearing,sunAz,sunEl,dest,stops[0],bearingSource,flipStop);
   renderDepartureFinder();
   show('scr-result');
 }
 
-function renderResult(trainBearing,sunAz,sunEl,dest,origin,src,flipNote){
+function renderResult(trainBearing,sunAz,sunEl,dest,origin,src,flipStop){
   // Relative angle: 0°=straight ahead, 90°=right, 180°=behind, 270°=left
   const rel=(sunAz-trainBearing+360)%360;
 
   let side,hl,hlClass,cardClass,diag,explain;
   const lineName=selDep.line?.name||'?';
   const elLow=sunEl<8;
+  const sw=t('sideWord');
 
   if(sunEl<-3){
-    side='none';hl='No direct sun 🌙';hlClass='hl-neutral';cardClass='rc-neutral';
-    explain='The sun is below the horizon. Both sides are equally comfortable.';
+    side='none';hl=t('noSun');hlClass='hl-neutral';cardClass='rc-neutral';
+    explain=t('noSunText');
     diag=buildDiag('none');
   } else if(elLow){
     const sideGuess=rel<180?'right':'left';
-    side='low';hl='Sun very low ⚠️';hlClass='hl-neutral';cardClass='rc-neutral';
-    explain=`At only ${sunEl.toFixed(0)}° elevation the sun can penetrate deeply. The ${sideGuess} side has more exposure - but shade side still wins.`;
+    side='low';hl=t('lowSun');hlClass='hl-neutral';cardClass='rc-neutral';
+    explain=t('lowSunText')(sunEl.toFixed(0),sw[sideGuess]);
     diag=buildDiag(sideGuess);
   } else if(rel<25||rel>335){
-    side='front';hl='Sun straight ahead';hlClass='hl-neutral';cardClass='rc-neutral';
-    explain='The sun is directly in the direction of travel. Central seats or the aisle minimise exposure.';
+    side='front';hl=t('sunAhead');hlClass='hl-neutral';cardClass='rc-neutral';
+    explain=t('sunAheadText');
     diag=buildDiag('front');
   } else if(rel>=25&&rel<155){
-    side='right';hl='Sit on the LEFT ←';hlClass='hl-left';cardClass='rc-left';
-    explain=`Sun is ${sunAz.toFixed(0)}° (${cardinalFromAz(sunAz)}) at ${sunEl.toFixed(0)}° - hitting the right side. Left side stays in shade.`;
+    side='right';hl=t('sitLeft');hlClass='hl-left';cardClass='rc-left';
+    explain=t('sitText')(sunAz.toFixed(0),cardinalFromAz(sunAz),sunEl.toFixed(0),sw.right,sw.left);
     diag=buildDiag('right');
   } else if(rel>=155&&rel<205){
-    side='back';hl='Any seat - sun behind';hlClass='hl-neutral';cardClass='rc-neutral';
-    explain='The sun is behind the train. Both sides receive minimal direct sunlight.';
+    side='back';hl=t('sunBehind');hlClass='hl-neutral';cardClass='rc-neutral';
+    explain=t('sunBehindText');
     diag=buildDiag('back');
   } else {
-    side='left';hl='Sit on the RIGHT →';hlClass='hl-right';cardClass='rc-right';
-    explain=`Sun is ${sunAz.toFixed(0)}° (${cardinalFromAz(sunAz)}) at ${sunEl.toFixed(0)}° - hitting the left side. Right side stays in shade.`;
+    side='left';hl=t('sitRight');hlClass='hl-right';cardClass='rc-right';
+    explain=t('sitText')(sunAz.toFixed(0),cardinalFromAz(sunAz),sunEl.toFixed(0),sw.left,sw.right);
     diag=buildDiag('left');
   }
 
-  const warn=elLow?`<div class="warn"><span class="warn-icon">⚠️</span><span>Low sun angle (${sunEl.toFixed(0)}°) can reach past seat backs. Shade side still recommended.</span></div>`:'';
-  const flip=flipNote?`<div class="warn"><span class="warn-icon">↪️</span><span>${flipNote}</span></div>`:'';
-  const radar=(radarActive&&radarVehicle)?`<div class="warn" style="background:var(--left-bg);border-color:var(--left-border)"><span class="warn-icon">📡</span><span>Train bearing from <strong>live vehicle GPS</strong> - most accurate result.</span></div>`:'';
+  const srcStr=src.key==='segments'?t('src').segments(src.n):t('src')[src.key];
+  const warn=elLow?`<div class="warn"><span class="warn-icon">⚠️</span><span>${t('warnLow')(sunEl.toFixed(0))}</span></div>`:'';
+  const flip=flipStop?`<div class="warn"><span class="warn-icon">↪️</span><span>${t('flipNote')(esc(flipStop))}</span></div>`:'';
+  const radar=(radarActive&&radarVehicle)?`<div class="warn" style="background:var(--left-bg);border-color:var(--left-border)"><span class="warn-icon">📡</span><span>${t('radarNote')}</span></div>`:'';
 
   document.getElementById('result-wrap').innerHTML=`
     <div class="result-card ${cardClass}">
@@ -828,15 +966,15 @@ function renderResult(trainBearing,sunAz,sunEl,dest,origin,src,flipNote){
     ${warn}${flip}${radar}
     <div id="dep-finder"></div>
     <div class="data-grid">
-      <div class="data-row"><span class="dr-label">Line</span><span class="dr-val">${esc(lineName)} → ${esc(selDep.direction||'?')}</span></div>
-      <div class="data-row"><span class="dr-label">Exit stop</span><span class="dr-val">${esc(dest.name)}</span></div>
-      <div class="data-row"><span class="dr-label">Train heading</span><span class="dr-val">${trainBearing.toFixed(0)}° ${bearingToCard(trainBearing)} <span style="color:var(--faint);font-weight:400;font-size:var(--xs)">(${src})</span></span></div>
-      <div class="data-row"><span class="dr-label">Sun azimuth</span><span class="dr-val">${sunAz.toFixed(1)}° ${cardinalFromAz(sunAz)}</span></div>
-      <div class="data-row"><span class="dr-label">Sun elevation</span><span class="dr-val">${sunEl.toFixed(1)}°</span></div>
-      <div class="data-row"><span class="dr-label">Relative sun angle</span><span class="dr-val">${rel.toFixed(0)}° (${rel<180?'right window':'left window'})</span></div>
+      <div class="data-row"><span class="dr-label">${t('lblLine')}</span><span class="dr-val">${esc(lineName)} → ${esc(selDep.direction||'?')}</span></div>
+      <div class="data-row"><span class="dr-label">${t('lblExit')}</span><span class="dr-val">${esc(dest.name)}</span></div>
+      <div class="data-row"><span class="dr-label">${t('lblHeading')}</span><span class="dr-val">${trainBearing.toFixed(0)}° ${bearingToCard(trainBearing)} <span style="color:var(--faint);font-weight:400;font-size:var(--xs)">(${srcStr})</span></span></div>
+      <div class="data-row"><span class="dr-label">${t('lblAz')}</span><span class="dr-val">${sunAz.toFixed(1)}° ${cardinalFromAz(sunAz)}</span></div>
+      <div class="data-row"><span class="dr-label">${t('lblEl')}</span><span class="dr-val">${sunEl.toFixed(1)}°</span></div>
+      <div class="data-row"><span class="dr-label">${t('lblRel')}</span><span class="dr-val">${rel.toFixed(0)}° (${rel<180?t('rightWindow'):t('leftWindow')})</span></div>
     </div>
     <div style="text-align:center;padding-bottom:var(--sp10)">
-      <button class="btn btn-ghost" onclick="show('scr-deps')">← Back to departures</button>
+      <button class="btn btn-ghost" onclick="show('scr-deps')">${t('backToDeps')}</button>
     </div>`;
 }
 
@@ -850,11 +988,11 @@ function buildDiag(side){
   return `<div class="diagram-wrap">
     ${sa}
     <div class="train-box">
-      <div class="seat ${ls}" title="Left side"></div>
+      <div class="seat ${ls}" title="${t('seatLeft')}"></div>
       <span style="font-size:20px;color:var(--faint)">${icon}</span>
-      <div class="seat ${rs}" title="Right side"></div>
+      <div class="seat ${rs}" title="${t('seatRight')}"></div>
     </div>
-    <div class="dir-label">→ direction of travel</div>
+    <div class="dir-label">${t('dirTravel')}</div>
   </div>`;
 }
 
@@ -877,9 +1015,10 @@ function renderDepartureFinder(){
 
   const now=Date.now();
   let rows=candidateDeps.map(d=>{
-    const t=new Date(d.when||d.plannedWhen);
-    const {az,el}=sunInfo(uLat,uLon,t);
-    return {dep:d,t,ms:+t,exp:sunnyExposure(legs,az,el),el};
+    // `tm`, not `t` - a local `t` would shadow the translation function.
+    const tm=new Date(d.when||d.plannedWhen);
+    const {az,el}=sunInfo(uLat,uLon,tm);
+    return {dep:d,t:tm,ms:+tm,exp:sunnyExposure(legs,az,el),el};
   }).filter(r=>r.ms-now>-90000);          // drop anything already gone
   rows.sort((a,b)=>a.ms-b.ms);
   rows=rows.slice(0,5);
@@ -893,14 +1032,14 @@ function renderDepartureFinder(){
 
   let body;
   if(rows.every(r=>r.el<-3)){
-    body=`<div class="finder-note">The sun is down for all of these — every departure is equally comfortable, so just take the next one.</div>`;
+    body=`<div class="finder-note">${t('finderSunDown')}</div>`;
   } else if(spread<0.10){
     // Honest: minutes-apart departures barely move the sun. Don't fake precision.
-    body=`<div class="finder-note">All similar right now — the shade barely changes across these departures. Take whichever is convenient.</div>`;
+    body=`<div class="finder-note">${t('finderSimilar')}</div>`;
   } else {
     body=rows.map((r,i)=>{
       const mins=Math.round((r.ms-now)/60000);
-      const minsStr=mins<=0?'now':`${mins}′`;
+      const minsStr=mins<=0?t('now'):`${mins}′`;
       const abs=r.t.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
       const pct=Math.round(r.exp*100);
       const chosen=Math.abs(r.ms-chosenMs)<1000;
@@ -908,11 +1047,11 @@ function renderDepartureFinder(){
       return `<div class="frow ${chosen?'chosen':''}" onclick="pickDeparture(${i})">
         <div class="frow-time"><div class="frow-mins">${minsStr}</div><div class="frow-abs">${abs}</div></div>
         <div class="frow-bar-wrap"><div class="frow-bar" style="width:${Math.max(3,pct)}%"></div></div>
-        <div class="frow-pct">${pct}% sun${isBest&&!chosen?'<span class="fbest">shadiest</span>':''}</div>
+        <div class="frow-pct">${pct}${t('pctSun')}${isBest&&!chosen?`<span class="fbest">${t('shadiest')}</span>`:''}</div>
       </div>`;
     }).join('');
   }
-  box.innerHTML=`<div class="finder"><div class="finder-hdr">Leave a bit later?</div>${body}</div>`;
+  box.innerHTML=`<div class="finder"><div class="finder-hdr">${t('finderHdr')}</div>${body}</div>`;
 }
 
 function pickDeparture(i){
@@ -933,10 +1072,13 @@ function show(id){
   document.getElementById(id).classList.add('active');
 }
 function showErr(msg){
-  document.getElementById('dep-list').innerHTML=`<div class="state-view"><div class="sv-icon">⚠️</div><h2>Error</h2><p>${msg}</p><button class="btn btn-ghost" onclick="show('scr-perm')" style="margin-top:var(--sp4)">← Start over</button></div>`;
+  document.getElementById('dep-list').innerHTML=`<div class="state-view"><div class="sv-icon">⚠️</div><h2>${t('error')}</h2><p>${msg}</p><button class="btn btn-ghost" onclick="show('scr-perm')" style="margin-top:var(--sp4)">${t('startOver')}</button></div>`;
   show('scr-deps');
 }
 function doRefresh(){if(uLat){show('scr-load');updateSunBar(uLat,uLon);loadDeps()}}
+
+// Apply the persisted (or default German) language to the static markup on load.
+applyLang();
 </script>
 </body>
 </html>
