@@ -127,5 +127,21 @@ eq(findFlip([{ bearing: 90, km: 1, from: "A" }, { bearing: 270, km: 1, from: "B"
 eq(findFlip([{ bearing: 90, km: 1, from: "A" }, { bearing: 100, km: 1, from: "B" }], 180), null,
   "no flip tag on a straight-ish route");
 
+// ── F3: follow-the-ride clock index ──────────────────────────────────────────
+// Mirror of the app's clockIdx: index of the last arrival at or before `now`;
+// 0 before the first; missing arrivals are skipped, not advanced past.
+function clockIdx(arrivals, now) {
+  let idx = 0;
+  arrivals.forEach((a, i) => { if (a && new Date(a).getTime() <= now) idx = i; });
+  return idx;
+}
+const T0 = Date.parse("2026-09-01T15:00:00Z");
+const ARR = [null, "2026-09-01T15:03:00Z", "2026-09-01T15:06:00Z", "2026-09-01T15:09:00Z"];
+eq(clockIdx(ARR, T0), 0, "before first arrival -> boarding stop");
+eq(clockIdx(ARR, T0 + 4 * 60000), 1, "between arrivals -> last stop reached");
+eq(clockIdx(ARR, T0 + 60 * 60000), 3, "long past the end -> exit stop, no overrun");
+eq(clockIdx([null, null, "2026-09-01T15:06:00Z", null], T0 + 7 * 60000), 2,
+  "missing arrivals are skipped, not advanced past");
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

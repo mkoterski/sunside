@@ -22,6 +22,7 @@
   --sbahn:#068e2a;--ubahn:#005daa;--tram:#cc0000;--bus:#8b008b;--regional:#7a4e2d;
   --ok:#2d7a3a;
   --rail-neutral:#d9d5ca;
+  --progress-track:#e3dfd6;--status-bg:#1c1a15;
   --sh-sm:0 1px 3px oklch(0.2 0.01 80/0.07);
   --sh-md:0 4px 16px oklch(0.2 0.01 80/0.09);
   --sh-lg:0 12px 40px oklch(0.2 0.01 80/0.14);
@@ -46,6 +47,7 @@
   --right:#e86060;--right-bg:#2d0e0e;--right-border:oklch(from #e86060 l c h / 0.3);
   --sbahn:#2db84a;--ubahn:#4d96dd;--tram:#e84040;--bus:#c080e0;--regional:#c09060;
   --rail-neutral:#3a4048;
+  --progress-track:#2a271f;--status-bg:#0f1218;
   --sh-sm:0 1px 3px oklch(0 0 0/0.3);--sh-md:0 4px 16px oklch(0 0 0/0.4);--sh-lg:0 12px 40px oklch(0 0 0/0.5);
 }
 @media(prefers-color-scheme:dark){:root:not([data-theme]){
@@ -57,6 +59,7 @@
   --right:#e86060;--right-bg:#2d0e0e;
   --sbahn:#2db84a;--ubahn:#4d96dd;--tram:#e84040;--bus:#c080e0;
   --rail-neutral:#3a4048;
+  --progress-track:#2a271f;--status-bg:#0f1218;
   --sh-sm:0 1px 3px oklch(0 0 0/0.3);--sh-md:0 4px 16px oklch(0 0 0/0.4);
 }}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -294,6 +297,31 @@ button:focus-visible,.dep-card:focus-visible,.stop-item:focus-visible{outline:2p
 .spine-flag.exit{background:var(--text);color:var(--inv)}
 .spine-flag.flips{background:var(--sun);color:#1c1a15}
 
+/* ── Follow-the-ride (v2A item 4 / F3) ── */
+.j-status{background:var(--status-bg);border-radius:16px;padding:15px 16px;color:var(--inv);
+  display:flex;align-items:center;gap:var(--sp3);margin-bottom:var(--sp4)}
+[data-theme="dark"] .j-status{color:var(--text)}
+@media(prefers-color-scheme:dark){:root:not([data-theme]) .j-status{color:var(--text)}}
+.js-main{flex:1;min-width:0}
+.js-top{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp2)}
+.js-eyebrow{font-size:0.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--sun)}
+.js-src{font-size:0.68rem;color:#9FB0C9;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.js-seg{font-size:1.02rem;font-weight:800;letter-spacing:-.02em;margin-top:4px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.js-shade{font-size:0.8rem;margin-top:2px}
+.j-play{width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff;
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.9rem}
+.j-wrap{position:relative;padding-left:34px}
+.j-track,.j-fill{position:absolute;left:23px;width:3px;border-radius:2px}
+.j-track{top:10px;bottom:30px;background:var(--progress-track)}
+.j-fill{top:10px;height:0;background:var(--sun);transition:height .6s ease}
+.j-list{position:relative;max-height:56dvh;overflow-y:auto}
+.j-list .spine-row{transition:opacity .4s ease}
+.j-list .spine-row.passed{opacity:.4}
+.j-list .spine-row.current .spine-dot{width:14px;height:14px;background:var(--sun);
+  border:2.5px solid var(--accent);box-shadow:0 0 0 4px rgba(245,166,35,.28)}
+@media(prefers-reduced-motion:reduce){.j-list .spine-row.current .spine-dot{box-shadow:none}}
+
 .data-grid{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:var(--sp4)}
 .data-row{display:flex;align-items:center;justify-content:space-between;padding:var(--sp3) var(--sp4);border-bottom:1px solid var(--divider);font-size:var(--sm)}
 .data-row:last-child{border-bottom:none}
@@ -436,6 +464,19 @@ button:focus-visible,.dep-card:focus-visible,.stop-item:focus-visible{outline:2p
   </div>
 </div>
 
+<!-- SCREEN: follow-the-ride (v2A item 4 / F3). Status card + spine reuse;
+     clock/radar-driven, interval cleared by show() on leaving the screen. -->
+<div class="screen" id="scr-journey">
+  <div class="section">
+    <button class="back-btn" onclick="show('scr-result')" data-i18n="back">← Back</button>
+    <div class="j-status" id="j-status"></div>
+    <div class="j-wrap">
+      <div class="j-track"></div><div class="j-fill" id="j-fill"></div>
+      <div class="j-list" id="j-list"></div>
+    </div>
+  </div>
+</div>
+
 </main>
 </div>
 
@@ -528,6 +569,14 @@ de:{
   flagBoard:'einstieg', flagExit:'ausstieg', flagFlips:'wechsel',
   shadeLeftLbl:'← Schatten', shadeRightLbl:'Schatten →',
   evenLbl:'neutral', sunDownLbl:'Sonne unten',
+  follow:'▶ Fahrt folgen',
+  stopOf:(n,m)=>`Jetzt · Halt ${n} von ${m}`,
+  arrived:'Angekommen', done:'✓ fertig',
+  clockSrc:'Uhrzeit-Schätzung',
+  shadeLineLeft:'Schatten links ←', shadeLineRight:'Schatten rechts →',
+  shadeLineNone:'Keine klare Schattenseite',
+  stayCool:'Bleib kühl.',
+  backAria:'Zurück', playAria:'Abspielen/Pause',
 },
 en:{
   azLabel:'az', elevLabel:'elev',
@@ -596,6 +645,14 @@ en:{
   flagBoard:'board', flagExit:'exit', flagFlips:'flips',
   shadeLeftLbl:'← shade', shadeRightLbl:'shade →',
   evenLbl:'even', sunDownLbl:'sun down',
+  follow:'▶ Follow the ride',
+  stopOf:(n,m)=>`Now · stop ${n} of ${m}`,
+  arrived:'Arrived', done:'✓ done',
+  clockSrc:'clock estimate',
+  shadeLineLeft:'Shade on the left ←', shadeLineRight:'Shade on the right →',
+  shadeLineNone:'No clear shaded side',
+  stayCool:'Hope you stayed cool.',
+  backAria:'Back', playAria:'Play or pause',
 }};
 let lang=(function(){try{const s=localStorage.getItem('sunside/lang');if(s==='de'||s==='en')return s}catch(e){}return 'de'})();
 function t(key){return STR[lang][key]}
@@ -615,6 +672,7 @@ function applyLang(){
   if(active==='scr-deps'&&allDeps.length){renderDeps(allDeps);setLocLabel()}
   if(active==='scr-stops'&&selDep){renderJourneyCard();renderVehicleStrip(radarVehicle);renderStops(selTrip)}
   if(active==='scr-result'&&selStops){calcSun(selStopIdx,selStops,selDepChosen)}
+  if(active==='scr-journey'&&legAnalysis){renderJourney();updateJourney()}
 }
 document.getElementById('lang-toggle').addEventListener('click',()=>{lang=lang==='de'?'en':'de';applyLang()});
 
@@ -697,7 +755,7 @@ function histSaveTrip(dep,fromStop,toStop){
 // directly. Testing-only: that path shares VBB's global 100 req/min bucket.
 const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
   ||(typeof location!=='undefined'&&location.hostname.endsWith('github.io')?'https://v6.vbb.transport.rest':'/api');
-console.log('SunSide Berlin v0.14 - API base:',API);
+console.log('SunSide Berlin v0.15 - API base:',API);
 let uLat=null,uLon=null;
 let allDeps=[];
 let selDep=null;
@@ -1156,6 +1214,7 @@ function renderResult(trainBearing,sunAz,sunEl,dest,origin,src,flipStop){
       <div class="result-headline ${hlClass}">${hl}</div>
       <div class="result-sub">${explain}</div>
       ${renderMeter()}
+      ${legAnalysis&&legAnalysis.rows.length>1?`<button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:var(--sp4)" onclick="openJourney()">${t('follow')}</button>`:''}
     </div>
     ${warn}${flip}${radar}
     <div id="dep-finder"></div>
@@ -1199,37 +1258,143 @@ function renderMeter(){
 // Travel-order stop list; the rail between stops is tinted by the side the sun
 // strikes on that segment (so the shade label reads the opposite side). Row i
 // carries the leg DEPARTING stop i; the exit row has no rail.
+const railColor=s=>s==='right'?'var(--left)':s==='left'?'var(--right)':'var(--rail-neutral)';
+const shadeLbl=s=>s==='right'?t('shadeLeftLbl'):s==='left'?t('shadeRightLbl'):s==='down'?t('sunDownLbl'):t('evenLbl');
+
+// One spine row, shared by the result-screen spine and the journey list.
+// opts.cls adds row classes (e.g. the entrance stagger), opts.id sets an id so
+// the journey ticker can address rows without re-rendering the list.
+function spineRowHTML(s,i,rows,legs,flip,opts={}){
+  const leg=legs[i];             // undefined on the exit row
+  const last=i===rows.length-1;
+  const dot=i===0?'<div class="spine-dot board"></div>'
+    :last?'<div class="spine-dot exit"></div>'
+    :`<div class="spine-dot mid" style="border:2px solid ${railColor(leg.side)}"></div>`;
+  const rail=leg?`<div class="spine-rail" style="background:${railColor(leg.side)}"></div>`:'';
+  const flags=[
+    i===0?`<span class="spine-flag board">${t('flagBoard')}</span>`:'',
+    last?`<span class="spine-flag exit">${t('flagExit')}</span>`:'',
+    flip&&s.name===flip?`<span class="spine-flag flips">${t('flagFlips')}</span>`:'',
+  ].join('');
+  const meta=leg?`${flags}<span>${Math.round(leg.bearing)}° ${cardinalFromAz(leg.bearing)} · ${leg.km.toFixed(2)} km</span>`:flags;
+  return `
+  <div class="spine-row ${opts.cls||''}"${opts.id?` id="${opts.id}"`:''}${opts.cls==='anim'?` style="animation-delay:${i*35}ms"`:''}>
+    <div class="spine-gutter">${dot}${rail}</div>
+    <div class="spine-body" ${last?'style="padding-bottom:0"':''}>
+      <div class="spine-top">
+        <span class="spine-name">${esc(s.name)}</span>
+        ${leg?`<span class="spine-shade" style="color:${railColor(leg.side)}">${shadeLbl(leg.side)}</span>`:''}
+      </div>
+      ${meta?`<div class="spine-meta">${meta}</div>`:''}
+    </div>
+  </div>`;
+}
+
 function renderSpine(){
   if(!legAnalysis||!legAnalysis.legs.length)return'';
   const {rows,legs,flip}=legAnalysis;
-  const railColor=s=>s==='right'?'var(--left)':s==='left'?'var(--right)':'var(--rail-neutral)';
-  const shadeLbl=s=>s==='right'?t('shadeLeftLbl'):s==='left'?t('shadeRightLbl'):s==='down'?t('sunDownLbl'):t('evenLbl');
-  const html=rows.map((s,i)=>{
-    const leg=legs[i];             // undefined on the exit row
-    const last=i===rows.length-1;
-    const dot=i===0?'<div class="spine-dot board"></div>'
-      :last?'<div class="spine-dot exit"></div>'
-      :`<div class="spine-dot mid" style="border:2px solid ${railColor(leg.side)}"></div>`;
-    const rail=leg?`<div class="spine-rail" style="background:${railColor(leg.side)}"></div>`:'';
-    const flags=[
-      i===0?`<span class="spine-flag board">${t('flagBoard')}</span>`:'',
-      last?`<span class="spine-flag exit">${t('flagExit')}</span>`:'',
-      flip&&s.name===flip?`<span class="spine-flag flips">${t('flagFlips')}</span>`:'',
-    ].join('');
-    const meta=leg?`${flags}<span>${Math.round(leg.bearing)}° ${cardinalFromAz(leg.bearing)} · ${leg.km.toFixed(2)} km</span>`:flags;
-    return `
-    <div class="spine-row anim" style="animation-delay:${i*35}ms">
-      <div class="spine-gutter">${dot}${rail}</div>
-      <div class="spine-body" ${last?'style="padding-bottom:0"':''}>
-        <div class="spine-top">
-          <span class="spine-name">${esc(s.name)}</span>
-          ${leg?`<span class="spine-shade" style="color:${railColor(leg.side)}">${shadeLbl(leg.side)}</span>`:''}
-        </div>
-        ${meta?`<div class="spine-meta">${meta}</div>`:''}
-      </div>
-    </div>`;
-  }).join('');
+  const html=rows.map((s,i)=>spineRowHTML(s,i,rows,legs,flip,{cls:'anim'})).join('');
   return `<div class="spine"><div class="spine-eyebrow">${t('route')}</div>${html}</div>`;
+}
+
+// ── Follow-the-ride (v2A item 4 / F3) ──────────────────
+// Clock/radar-driven, NOT a demo timer: the current stop comes from comparing
+// Date.now() with the stopovers' arrival times, and the radar position wins
+// whenever the vehicle is actually located. jReplay overrides both while the
+// arrived-state replay animation walks the ride once more.
+let jTimer=null, jPaused=false, jReplay=null;
+
+// Pure: index of the last arrival at or before `now`; 0 before the first.
+function clockIdx(arrivals,now){
+  let idx=0;
+  arrivals.forEach((a,i)=>{if(a&&new Date(a).getTime()<=now)idx=i});
+  return idx;
+}
+
+function journeyIdx(){
+  const rows=legAnalysis.rows;
+  if(jReplay!=null)return Math.min(jReplay,rows.length-1);
+  if(radarActive&&radarVehicle?.location){
+    let best=0,bd=Infinity;
+    rows.forEach((s,i)=>{
+      if(s.lat==null)return;
+      const d=haversine(radarVehicle.location.latitude,radarVehicle.location.longitude,s.lat,s.lon);
+      if(d<bd){bd=d;best=i}
+    });
+    return best;
+  }
+  return clockIdx(rows.map(s=>s.arrival),Date.now());
+}
+
+function openJourney(){
+  jPaused=false;jReplay=null;
+  renderJourney();
+  show('scr-journey');
+  updateJourney();
+  jTimer=setInterval(updateJourney,5000);
+}
+
+function renderJourney(){
+  const {rows,legs,flip}=legAnalysis;
+  document.getElementById('j-list').innerHTML=
+    rows.map((s,i)=>spineRowHTML(s,i,rows,legs,flip,{id:`j-row-${i}`})).join('');
+}
+
+function updateJourney(){
+  if(!legAnalysis)return;
+  const {rows,legs}=legAnalysis;
+  const idx=journeyIdx();
+  const arrived=idx>=rows.length-1&&jReplay==null;
+  const live=radarActive&&radarVehicle;
+  const src=arrived?t('done'):live?`<span class="live-dot"></span>${t('liveGps')}`:t('clockSrc');
+  const leg=legs[Math.min(idx,legs.length-1)];
+  const seg=arrived?esc(rows[rows.length-1].name):`${esc(leg.from)} → ${esc(leg.to)}`;
+  const shade=arrived?t('stayCool')
+    :leg.side==='right'?`<span style="color:#8FA8CE">${t('shadeLineLeft')}</span>`
+    :leg.side==='left'?`<span style="color:var(--sun)">${t('shadeLineRight')}</span>`
+    :t('shadeLineNone');
+  document.getElementById('j-status').innerHTML=`
+    <div class="js-main">
+      <div class="js-top">
+        <span class="js-eyebrow">${arrived?t('arrived'):t('stopOf')(idx+1,rows.length)}</span>
+        <span class="js-src">${src}</span>
+      </div>
+      <div class="js-seg">${seg}</div>
+      <div class="js-shade">${shade}</div>
+    </div>
+    <button class="j-play" aria-label="${t('playAria')}" onclick="jToggle()">${arrived?'↺':jPaused?'▶':'❚❚'}</button>`;
+  rows.forEach((s,i)=>{
+    const el=document.getElementById(`j-row-${i}`);
+    if(!el)return;
+    el.classList.toggle('passed',i<idx);
+    el.classList.toggle('current',i===idx&&!arrived);
+  });
+  const frac=rows.length>1?idx/(rows.length-1):1;
+  document.getElementById('j-fill').style.height=`calc((100% - 40px)*${frac})`;
+  // Pause suspends the follow/auto-scroll, not the data.
+  if(!jPaused){
+    const list=document.getElementById('j-list');
+    const cur=document.getElementById(`j-row-${idx}`);
+    if(cur)list.scrollTop=Math.max(0,cur.offsetTop-70);
+  }
+}
+
+function jToggle(){
+  const arrived=journeyIdx()>=legAnalysis.rows.length-1&&jReplay==null;
+  if(arrived){
+    // Replay: walk the ride once more from the boarding stop, then settle
+    // back into the clock-driven arrived state.
+    clearInterval(jTimer);jReplay=0;jPaused=false;updateJourney();
+    jTimer=setInterval(()=>{
+      jReplay++;updateJourney();
+      if(jReplay>=legAnalysis.rows.length-1){
+        jReplay=null;clearInterval(jTimer);
+        jTimer=setInterval(updateJourney,5000);updateJourney();
+      }
+    },1200);
+    return;
+  }
+  jPaused=!jPaused;updateJourney();
 }
 
 function buildDiag(side){
@@ -1324,6 +1489,8 @@ function esc(s){
 function show(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  // Leaving the journey screen must clear its ticker (F3).
+  if(id!=='scr-journey'&&jTimer){clearInterval(jTimer);jTimer=null;jReplay=null}
   // Off the result screen the analysed departure no longer applies - the sun
   // bar goes back to the live clock (v2A item 3).
   if(sunBarWhen&&(id==='scr-perm'||id==='scr-deps')){

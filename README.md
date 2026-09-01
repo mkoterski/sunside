@@ -1,4 +1,4 @@
-# SunSide Berlin - v0.14
+# SunSide Berlin - v0.15
 
 **Status:** DEVELOPMENT
 **Versioning:** `v0.x` = development/testing, `v1.x` = production-ready
@@ -112,6 +112,7 @@ Worker - but two things still work:
 | Sun-side verdict | Sit left / sit right / neutral, with the sun's azimuth and elevation, computed per segment and distance-weighted |
 | Route spine | Travel-order stop list on the result screen; the rail between stops is tinted by which side the sun strikes on that segment, with board/exit/flips flags and per-segment bearing + km |
 | Shade meter | Distance-weighted km bar in the verdict card: shade-left / even / shade-right, each share paired with its number |
+| Follow the ride | Journey view reached from the verdict: pinned status card (current segment, shade side, clock-estimate vs live-GPS source), the spine with current/passed states, a vertical progress bar, auto-follow with pause, and a replay once arrived. Clock/radar-driven, not a demo timer |
 | Flip warning | When the shaded side genuinely changes mid-trip, the verdict says so instead of averaging it away |
 | Live radar | The actual vehicle's GPS position via VBB radar; its live bearing is preferred on single-leg rides |
 | Best-departure finder | Ranks the next departures of the same line by sun exposure - and says honestly when they barely differ |
@@ -132,6 +133,16 @@ History before v0.10 predates the numbering and is archived by date.
 ### Changelog
 
 ```
+v0.15  2026-09-01  F3 landed - v2A part 2, follow-the-ride: a journey screen
+                   off the verdict. Dark status card (stop n of m, current
+                   segment, shade side, clock-estimate vs live-GPS badge),
+                   the spine reused with current/passed row states, vertical
+                   progress bar, auto-follow via scrollTop (not scrollIntoView)
+                   with pause, replay in the arrived state. Clock/radar-driven;
+                   show() clears the ticker on leaving the screen. New pure
+                   assertions for the clock index (before/between/past/missing
+                   arrivals). The spine row builder is shared, not duplicated.
+
 v0.14  2026-09-01  v2A design pass, part 1 (docs/design-handoff-v2a.md): the app
                    finally shows the per-segment analysis it always computed.
                    Route spine on the result screen (rail tinted by sunny side,
@@ -189,9 +200,7 @@ one when an item lands.
 
 ### Planned features
 
-| ID | Pri | Item | Notes |
-|---|---|---|---|
-| F3 | P2 | Follow-the-ride screen | v2A item 4, deferred from v0.14 as the handoff itself suggests. Spec in [`docs/design-handoff-v2a.md`](docs/design-handoff-v2a.md) §4: clock/radar-driven journey view reusing the spine, with progress bar, pinned status card and play/pause. |
+Nothing open right now.
 
 ### Settled
 
@@ -201,6 +210,7 @@ Decided or built, kept here so the IDs are not reused.
 |---|---|---|
 | F1 | 2026-09-01 | Landed in v0.11 as a DE/EN toggle in the header, German default, persisted in `localStorage`. |
 | F2 | 2026-09-01 | Landed in v0.13: encrypted history integrated as an opt-in card on the start screen, saves on every verdict, surfaces "recent" tags. One honest caveat from the module's own threat model stands: the app is one inline script, so the CSP hardening the module recommends against XSS is not in place yet - the encryption at rest is real either way. |
+| F3 | 2026-09-01 | Landed in v0.15: follow-the-ride journey screen per [`docs/design-handoff-v2a.md`](docs/design-handoff-v2a.md) §4. Clock/radar-driven; the replay button animates the ride once more after arrival. With this, the whole v2A handoff is implemented. |
 
 ### Architecture upgrades
 
@@ -233,8 +243,8 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.14`, DEVELOPMENT. The full loop works end to end against live
-data: departures → exit stop → verdict with route spine and shade meter, live
-radar, the best-departure finder and opt-in encrypted history, in German and
-English, deployed at the URL above. Verified in one desktop browser. The v2A
-design pass is half landed; F3 (follow-the-ride) is the open half.
+Prototype, `v0.15`, DEVELOPMENT. The full loop works end to end against live
+data: departures → exit stop → verdict with route spine and shade meter →
+follow-the-ride, with live radar, the best-departure finder and opt-in
+encrypted history, in German and English, deployed at the URL above. Verified
+in one desktop browser. The v2A design handoff is fully implemented.
