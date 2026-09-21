@@ -1,4 +1,4 @@
-# SunSide — Design Brief
+# SunSide - Design Brief
 
 A design specification for **SunSide Berlin**, a mobile-first web app that tells public-transit
 riders which side of a vehicle (left or right, relative to travel direction) stays in the shade,
@@ -10,7 +10,7 @@ Claude Design as the source of truth for recreating or extending the UI.
 ## 1. Product in one line
 
 You're about to board a tram/bus/train in the sun. SunSide tells you **which side to sit on to stay
-in the shade** — computed per segment of your specific trip, weighted by distance, with the
+in the shade** - computed per segment of your specific trip, weighted by distance, with the
 recommendation shifting by time of day.
 
 ## 2. Brand & voice
@@ -18,7 +18,7 @@ recommendation shifting by time of day.
 - **Tone:** practical, calm, a little warm. It's a small daily-life utility, not a serious transit
   app. Plain language ("Sit on the left"), never jargon.
 - **Name styling:** "Sun" in ink, "Side" in sun-amber, set in a heavy uppercase grotesque.
-- **Personality cue:** the whole UI should *feel* like sun and shade — warmth vs cool shadow — not
+- **Personality cue:** the whole UI should *feel* like sun and shade - warmth vs cool shadow - not
   like a data dashboard.
 
 ## 3. Design tokens
@@ -47,7 +47,7 @@ clear side.
 - **Display / headings:** Helvetica Neue / Arial, weight 800, tight letter-spacing (`-0.02em`),
   uppercase for the wordmark and section eyebrows.
 - **Body:** system sans (-apple-system / Segoe UI / Roboto), 0.8–0.95rem.
-- **Data (bearings, distances, times, counts):** monospace (`ui-monospace`, SF Mono, Menlo) — the
+- **Data (bearings, distances, times, counts):** monospace (`ui-monospace`, SF Mono, Menlo) - the
   numbers should read like instrument readouts.
 - **Eyebrows / labels:** 0.64rem, uppercase, letter-spacing `0.12–0.15em`, slate, weight 700.
 
@@ -71,8 +71,8 @@ side is shaded**:
   Current (in journey mode) = amber fill, tram-red border, amber glow.
 - Each row shows: stop name (+ flags), and below it the segment's bearing + distance in mono
   (`211° SW · 0.42 km`). Right-aligned: `shade →` / `← shade` / `even`.
-- **Flags:** `board` (tram-red), `exit` (ink), `flips` (amber — shade side changes here),
-  `now` (amber — current position in journey mode).
+- **Flags:** `board` (tram-red), `exit` (ink), `flips` (amber - shade side changes here),
+  `now` (amber - current position in journey mode).
 
 This spine appears on the result screen (static) and the journey screen (with live current-position
 highlight + vertical progress bar).
@@ -84,7 +84,7 @@ highlight + vertical progress bar).
 - **Context bar:** rounded card holding editable Location / Date / Time / Radius. Date & time are
   native inputs (mono font); radius is a slider with a mono value readout.
 - **Stop card:** white rounded card; stop name, a row of line pills, distance in mono on the right.
-- **Line pill:** small colored rounded chip with the line number. Color by mode — tram `--tram`,
+- **Line pill:** small colored rounded chip with the line number. Color by mode - tram `--tram`,
   bus `#6b4ea0`, U-Bahn `#1f6fb2`, S-Bahn `#2e8b57`.
 - **Direction bar:** active-direction heading ("→ toward X") with a "⇄ Flip" button; a small
   "Other way: …" hint below.
@@ -108,34 +108,34 @@ highlight + vertical progress bar).
 
 ## 6. Screens & flow
 
-The app is a four-step journey. Selections advance immediately — **no confirm buttons**; tapping a
+The app is a four-step journey. Selections advance immediately - **no confirm buttons**; tapping a
 choice navigates.
 
-### Screen 1 — Stops near you
+### Screen 1 - Stops near you
 - Wordmark header.
 - Context bar: Location (auto, editable), Date (auto, editable), Time (auto, editable), Radius slider
   (200–1200 m). Changing date/time changes the sun and therefore every downstream recommendation.
 - List of nearby stop cards within the radius, each with line pills + distance. Tapping a stop →
   Screen 2.
 
-### Screen 2 — Line → destination
-- Title = the chosen stop. Step A: "Choose your line" — tap a line pill row.
-- Step B: "Where are you going?" — shows **only the forward direction's stops** by default under a
+### Screen 2 - Line → destination
+- Title = the chosen stop. Step A: "Choose your line" - tap a line pill row.
+- Step B: "Where are you going?" - shows **only the forward direction's stops** by default under a
   "→ toward X" heading, with a "⇄ Flip" button to switch direction, and a type-to-filter field.
   Tapping a destination stop → Screen 3. (Direction is inferred from the chosen stop; never asked.)
 - Back is step-aware: from stop list → line choice; from line choice → Screen 1.
 
-### Screen 3 — Where to sit (the result)
+### Screen 3 - Where to sit (the result)
 - Line pill + "boarding → destination" route summary.
 - Verdict card: arrow + "Sit on the left/right" + explanation + shade meter + per-side km.
 - "▶ Follow the ride" button → Screen 4.
 - The full route spine (static), with `board`, `flips`, `exit` flags.
 
-### Screen 4 — Follow the ride (auto-advancing) — **v2**
+### Screen 4 - Follow the ride (auto-advancing) - **v2**
 - Status card pinned at top with the current segment, shade side, and **play/pause** control.
 - The ride **auto-advances on a timer** (no dragging). In the real app this is driven by the live
   clock against scheduled stop times, switching to **GPS** (transit radar) when the vehicle is located
-  — the source badge reflects which is in use.
+  - the source badge reflects which is in use.
 - The route list **auto-scrolls** to keep the current stop **near the top** (~70px down), with
   upcoming stops below and passed stops dimmed above.
 - A **vertical progress bar** down the left tracks position (replacing any horizontal slider); its
@@ -146,7 +146,7 @@ choice navigates.
 ## 7. Worked example (use as the canonical demo data)
 
 **Tram 50, Hugenottenplatz → U Seestraße, Berlin.** A long ride that runs south through Pankow then
-turns west into Wedding — so the shaded side can flip mid-trip, which is the whole point of
+turns west into Wedding - so the shaded side can flip mid-trip, which is the whole point of
 per-segment analysis. ~28 segments. Real stop coordinates exist for this route. At low morning/evening
 sun the verdict is a strong single side; near midday it's a narrow call because much of the route runs
 toward the southern sun (neither side shaded).
@@ -154,15 +154,15 @@ toward the southern sun (neither side shaded).
 ## 8. Accessibility & states
 
 - Honor reduced-motion.
-- Empty/no-match states: friendly text ("No stops within X m — widen the radius"; "No stops match …
-  — flip the direction").
+- Empty/no-match states: friendly text ("No stops within X m - widen the radius"; "No stops match …
+  - flip the direction").
 - Sun-below-horizon: verdict becomes "either side", arrow hidden, copy explains no direct sun.
 - Touch targets ≥ ~40px; selection = navigation, so every tappable row must feel tappable
   (active-state scale ~0.99).
 
 ## 9. Out of scope / notes for design
 
-- Map view (route on OpenStreetMap) is an *optional* secondary view, not the default — a glance-first
+- Map view (route on OpenStreetMap) is an *optional* secondary view, not the default - a glance-first
   utility favors the spine over a map.
 - A faster future flow worth exploring: type-to-search the destination directly and skip line
   selection (line + direction both fall out of the destination).

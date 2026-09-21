@@ -682,8 +682,8 @@ en:{
   dirTravel:'→ direction of travel',
   seatLeft:'Left side', seatRight:'Right side',
   finderHdr:'Leave a bit later?',
-  finderSunDown:'The sun is down for all of these — every departure is equally comfortable, so just take the next one.',
-  finderSimilar:'All similar right now — the shade barely changes across these departures. Take whichever is convenient.',
+  finderSunDown:'The sun is down for all of these - every departure is equally comfortable, so just take the next one.',
+  finderSimilar:'All similar right now - the shade barely changes across these departures. Take whichever is convenient.',
   pctSun:'% sun', shadiest:'shadiest',
   error:'Error', startOver:'← Start over',
   langAria:'Switch language', themeAria:'Toggle theme',
@@ -856,9 +856,9 @@ function updateSunBar(lat,lon,when){
   const at=when||new Date();
   const {az,el}=sunInfo(lat,lon,at);
   const down=el<-3; // below horizon: azimuth is real but misleading - show a dash
-  document.getElementById('sb-az').textContent=down?'—':az.toFixed(1)+'°';
+  document.getElementById('sb-az').textContent=down?'-':az.toFixed(1)+'°';
   document.getElementById('sb-el').textContent=el.toFixed(1)+'°';
-  document.getElementById('sb-dir').textContent=down?'—':cardinalFromAz(az);
+  document.getElementById('sb-dir').textContent=down?'-':cardinalFromAz(az);
   document.getElementById('sb-time').textContent=at.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
 }
 setInterval(()=>{if(uLat)updateSunBar(uLat,uLon,sunBarWhen)},60000);
@@ -1309,7 +1309,7 @@ function sideForBearing(sunAz,bearing){
   return 'neutral';                       // front / behind
 }
 
-// Fraction of the ride (0..1, distance-weighted) where the sun strikes a side —
+// Fraction of the ride (0..1, distance-weighted) where the sun strikes a side -
 // i.e. how much of the trip the SUNNY side is exposed. Lower = shadier overall,
 // regardless of which side. This is what the best-departure finder ranks on:
 // because the geometry is fixed across departures of one line, the only thing
@@ -1347,7 +1347,7 @@ function calcSun(stopIdx, stops, dep){
   dep=dep||selDep;
   selStopIdx=stopIdx; selStops=stops; selDepChosen=dep;
   // Live radar only describes the vehicle we actually located, so it applies
-  // only when the active departure is that same trip — not a future sibling.
+  // only when the active departure is that same trip - not a future sibling.
   radarActive=!!(dep.tripId&&selDep&&dep.tripId===selDep.tripId);
   const dest=stops[stopIdx];
   const depTime=new Date(dep.when||dep.plannedWhen);

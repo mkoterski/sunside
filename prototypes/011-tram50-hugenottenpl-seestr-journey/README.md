@@ -1,26 +1,26 @@
 # SunSide journey prototype
 
 A clickable, fully offline prototype of the whole SunSide user journey, in one
-self-contained HTML file. No API, no network, no build — open `index.html`.
+self-contained HTML file. No API, no network, no build - open `index.html`.
 
 It uses the verified tram 50 (Hugenottenplatz → U Seestraße) route as the worked
 example, with the same sun-position maths and shade logic as the live app.
 
 ## The four steps
 
-1. **Stops near you** — a list of nearby stops within an adjustable radius. Location,
+1. **Stops near you** - a list of nearby stops within an adjustable radius. Location,
    date, and time are pre-filled (as if auto-detected) and all editable; changing the
    date/time changes the sun and therefore the recommendation.
-2. **Pick line → destination** — tap a stop, tap a line, then tap where you're
+2. **Pick line → destination** - tap a stop, tap a line, then tap where you're
    getting off. By default only the forward direction's stops are listed (under a
    "toward X" heading); a "⇄ Flip" button switches to the other direction. A
    type-to-filter field lets you jump straight to a destination by name. The
    direction is inferred from the chosen stop, so you never pick it explicitly, and
-   every tap advances immediately — there are no confirm buttons.
-3. **Where to sit** — the result screen (the previously built demo): the left/right
+   every tap advances immediately - there are no confirm buttons.
+3. **Where to sit** - the result screen (the previously built demo): the left/right
    verdict with directional arrow, the distance-weighted shade meter, and the full
    stop-by-stop breakdown.
-4. **Follow the ride** — a live journey view that highlights the segment you're
+4. **Follow the ride** - a live journey view that highlights the segment you're
    currently on and shows which side is shaded right now. Drag the simulate control to
    move along the trip.
 
@@ -39,6 +39,6 @@ example, with the same sun-position maths and shade logic as the live app.
   would all come from the VBB API in the real app. (Direction is derived from the
   chosen destination, not asked separately.)
 - Step 4 ("follow the ride") would update from the live clock against scheduled stop
-  times, switching to GPS position (VBB radar) when the vehicle is located — the
+  times, switching to GPS position (VBB radar) when the vehicle is located - the
   prototype shows both states (the source badge flips from "clock estimate" to "live
   GPS" as you scrub past the start).

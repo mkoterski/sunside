@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>SunSide · Test Case 3 — Aubertstraße → Ferdinandshof</title>
+<title>SunSide · Test Case 3 - Aubertstraße → Ferdinandshof</title>
 <style>
   :root{
     --bg:#f5f2ec; --ink:#1c1a17; --muted:#6b6358;
@@ -176,7 +176,7 @@ let CURRENT_TIME="evening";
 /* shade side for one RE3 segment */
 function shadeForSeg(seg,timeKey){
   const s=sunPos(seg.lat,seg.lon,TIMES[timeKey],DOY);
-  if(s.el<3) return {relevant:false, el:s.el, reason:"sun is at/below the horizon — neither side has an edge."};
+  if(s.el<3) return {relevant:false, el:s.el, reason:"sun is at/below the horizon - neither side has an edge."};
   const rel=((s.az-seg.brg)%360+360)%360;
   const sunRight = rel<180;
   return {relevant:true, side: sunRight?"LEFT":"RIGHT", el:s.el, az:s.az,
@@ -199,7 +199,7 @@ function renderResult(){
   const pip=document.getElementById("vPip");
   if(!anyRelevant){
     pip.className="pip mix";
-    document.getElementById("vConf").textContent="Sun too low — sit anywhere";
+    document.getElementById("vConf").textContent="Sun too low - sit anywhere";
     document.getElementById("vSub").textContent="At this hour the sun is barely above the horizon, so neither side holds a meaningful advantage.";
   } else if(allSame){
     pip.className="pip hi";
@@ -208,7 +208,7 @@ function renderResult(){
   } else {
     pip.className="pip mix";
     document.getElementById("vConf").textContent=`Mostly ${winner.toLowerCase()} · ${Math.round(winKm)} of ${Math.round(relKm)} km`;
-    document.getElementById("vSub").textContent=`The line curves between NE and NW, so the better side flips a few times. ${winner[0]+winner.slice(1).toLowerCase()} wins the most distance — the spine below marks where it switches.`;
+    document.getElementById("vSub").textContent=`The line curves between NE and NW, so the better side flips a few times. ${winner[0]+winner.slice(1).toLowerCase()} wins the most distance - the spine below marks where it switches.`;
   }
 
   const meter=document.getElementById("vMeter");
@@ -228,7 +228,7 @@ function renderResult(){
           <div class="accesscard">
             <div class="top"><span class="pill ${a.cls}">${a.line}</span></div>
             <div class="seglabel">⊘ no sun-side call here</div>
-            <div class="why">${a.mode==="surface-short"?"short local hop — too brief to matter":"city S-Bahn into Gesundbrunnen — built up, windows mostly blocked"}</div>
+            <div class="why">${a.mode==="surface-short"?"short local hop - too brief to matter":"city S-Bahn into Gesundbrunnen - built up, windows mostly blocked"}</div>
           </div>
         </div>
       </div>`);
@@ -265,7 +265,7 @@ document.getElementById("timebar").addEventListener("click",e=>{
   CURRENT_TIME=b.dataset.t; renderResult();
 });
 
-/* journey follow — over the RE3 segments */
+/* journey follow - over the RE3 segments */
 let jIdx=0, jTimer=null, jPlaying=false;
 const NSEG=()=>ROUTE.segs.length;
 function goJourney(){

@@ -212,7 +212,7 @@
         </div>
       </div>
       <div id="stop-list"></div>
-      <div class="foot">Auto-detected location, date and time — all editable above. Adjust the radius to see more or fewer stops. (Prototype: stops and data are fixed sample values.)</div>
+      <div class="foot">Auto-detected location, date and time - all editable above. Adjust the radius to see more or fewer stops. (Prototype: stops and data are fixed sample values.)</div>
     </div>
   </section>
 
@@ -272,9 +272,9 @@
     </div>
     <div class="pad" style="display:flex;flex-direction:column;flex:1;min-height:0">
       <div class="journey-status">
-        <div class="now-seg" id="j-seglabel">Now · stop 1 of —</div>
-        <div class="now-stops" id="j-stops">—</div>
-        <div class="now-side" id="j-side">—</div>
+        <div class="now-seg" id="j-seglabel">Now · stop 1 of -</div>
+        <div class="now-stops" id="j-stops">-</div>
+        <div class="now-side" id="j-side">-</div>
         <div class="play-row">
           <button class="play-btn" id="j-play" aria-label="Pause">❚❚</button>
           <span class="play-meta" id="j-playmeta"><b>Playing</b> · auto-advancing · tap to pause</span>
@@ -282,7 +282,7 @@
         </div>
       </div>
       <div class="routehead">
-        <span>Route · auto-scrolling</span><span id="j-progresstext">1 / —</span>
+        <span>Route · auto-scrolling</span><span id="j-progresstext">1 / -</span>
       </div>
       <div class="listwrap" id="j-listwrap">
         <div class="vbar"><div class="vfill" id="j-vfill"></div><div class="vdot" id="j-vdot"></div></div>
@@ -409,7 +409,7 @@ function renderS2(){
   const stepEl=document.getElementById('s2-step');
   const opt=document.getElementById('s2-options');
 
-  if(step===0){ // choose line — tapping advances straight to the stop list
+  if(step===0){ // choose line - tapping advances straight to the stop list
     stepEl.textContent='Choose your line';
     opt.innerHTML=state.stop.lines.map(([n,c],i)=>`
       <div class="opt" data-line="${i}">
@@ -500,12 +500,12 @@ function computeResult(){
   if(el>0&&(win==='left'||win==='right')){arrow.hidden=false;arrow.classList.toggle('point-right',win==='right');}
   else arrow.hidden=true;
   const why=document.getElementById('r-why');
-  if(el<=0)why.textContent='The sun is below the horizon — no direct sunlight on either side.';
-  else if(win==='either side')why.textContent=`Sun at az ${az.toFixed(0)}° (${card(az)}). The route's turns split it evenly — neither side wins.`;
+  if(el<=0)why.textContent='The sun is below the horizon - no direct sunlight on either side.';
+  else if(win==='either side')why.textContent=`Sun at az ${az.toFixed(0)}° (${card(az)}). The route's turns split it evenly - neither side wins.`;
   else{
     const a=(win==='right'?weight.right:weight.left).toFixed(1),b=(win==='right'?weight.left:weight.right).toFixed(1);
     const m=Math.abs(weight.right-weight.left),str=m<0.8?'a narrow edge':m<2.5?'a clear edge':'a strong edge';
-    why.textContent=`Sun at az ${az.toFixed(0)}° (${card(az)}), elev ${el.toFixed(0)}°. The ${win} seat is shaded ${a} km vs ${b} km — ${str}.`;
+    why.textContent=`Sun at az ${az.toFixed(0)}° (${card(az)}), elev ${el.toFixed(0)}°. The ${win} seat is shaded ${a} km vs ${b} km - ${str}.`;
   }
   const pct=v=>total>0?v/total*100:0;
   document.getElementById('r-mr').style.flexBasis=pct(weight.right)+'%';
@@ -586,7 +586,7 @@ function renderJourney(){
   document.getElementById('j-seglabel').textContent=`Now · stop ${cur+1} of ${sub.length}`;
   document.getElementById('j-stops').textContent=`${seg.from} → ${seg.to}`;
   document.getElementById('j-side').innerHTML = seg.shade==='neutral'
-    ? 'On this stretch the sun is ahead or behind — <b>either side</b> is fine.'
+    ? 'On this stretch the sun is ahead or behind - <b>either side</b> is fine.'
     : `On this stretch, shade is on the <b>${seg.shade.toUpperCase()}</b>.`;
   document.getElementById('j-progresstext').textContent=`${cur+1} / ${sub.length}`;
   // source badge: GPS once moving, clock at the very start

@@ -195,8 +195,8 @@
     <input type="range" id="time" min="300" max="1320" step="5" value="765" aria-label="Time of day">
     <div class="arc-wrap"><svg id="arc" viewBox="0 0 520 96" preserveAspectRatio="none"></svg></div>
     <div class="ctrl-row" style="margin:0">
-      <span class="sun-stat" id="sun-az">az —</span>
-      <span class="sun-stat" id="sun-el">elev —</span>
+      <span class="sun-stat" id="sun-az">az -</span>
+      <span class="sun-stat" id="sun-el">elev -</span>
     </div>
   </div>
 
@@ -204,13 +204,13 @@
     <div class="spine-title">Stop by stop · <span id="seg-count">28</span> segments</div>
     <button id="map-toggle" class="map-btn" aria-pressed="false">Show map</button>
   </div>
-  <div id="map-note" class="map-note" hidden>Map tiles load from OpenStreetMap — needs a connection. The route line is colored by shaded side, same as the list below.</div>
+  <div id="map-note" class="map-note" hidden>Map tiles load from OpenStreetMap - needs a connection. The route line is colored by shaded side, same as the list below.</div>
   <div id="map" hidden></div>
   <div class="spine" id="spine"></div>
 
   <div class="foot">
     <b>How this works.</b> Every leg between two stops has a compass bearing. Given the
-    sun's position for the chosen time, each leg is scored by which side it strikes —
+    sun's position for the chosen time, each leg is scored by which side it strikes -
     the opposite side is the shaded seat. Legs are weighted by length, so the verdict
     reflects where you spend the ride, not just the count of segments. Coordinates are
     real stop locations; the live app reads them from VBB per trip.<br><br>
@@ -218,7 +218,7 @@
     route maps, which disagree on a stop or two. The full line runs ~32 stops end to end;
     this trip is a subset of it. The authoritative per-trip stop list and exact
     coordinates come from VBB's live trip data, which the real app uses.<br><br>
-    Demo location: Berlin (52.55°N, 13.40°E). Sun position computed inline (NOAA algorithm) — no external dependencies.
+    Demo location: Berlin (52.55°N, 13.40°E). Sun position computed inline (NOAA algorithm) - no external dependencies.
   </div>
 </div>
 
@@ -384,7 +384,7 @@ function render(){
   }
   const why=document.getElementById('verdict-why');
   if(el<=0){
-    why.textContent='The sun is below the horizon — no direct sunlight on either side. Sit wherever you like.';
+    why.textContent='The sun is below the horizon - no direct sunlight on either side. Sit wherever you like.';
   }else if(win==='either side'){
     why.textContent=`The sun (az ${az.toFixed(0)}°, ${card(az)}) is split evenly across the route's turns. Neither side wins by much.`;
   }else{
@@ -392,7 +392,7 @@ function render(){
     const other=(win==='right'?weight.left:weight.right).toFixed(1);
     const margin = Math.abs(weight.right-weight.left);
     const strength = margin<0.8 ? 'a narrow edge' : margin<2.5 ? 'a clear edge' : 'a strong edge';
-    why.textContent=`With the sun at az ${az.toFixed(0)}° (${card(az)}), elev ${el.toFixed(0)}°, the ${win} seat is shaded for ${shadedKm} km versus ${other} km on the other side — ${strength}. ${weight.neutral.toFixed(1)} km runs toward or away from the sun, shading neither side.`;
+    why.textContent=`With the sun at az ${az.toFixed(0)}° (${card(az)}), elev ${el.toFixed(0)}°, the ${win} seat is shaded for ${shadedKm} km versus ${other} km on the other side - ${strength}. ${weight.neutral.toFixed(1)} km runs toward or away from the sun, shading neither side.`;
   }
 
   // meter (flex-basis proportions)

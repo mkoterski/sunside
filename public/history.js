@@ -1,9 +1,9 @@
 /*
- * SunSide — encrypted local history (zero-knowledge, passphrase-gated)
+ * SunSide - encrypted local history (zero-knowledge, passphrase-gated)
  * ──────────────────────────────────────────────────────────────────────────
  * Stores recent stops and recent trips ENCRYPTED in the browser only. Nothing
  * leaves the device. The encryption key is derived from a user passphrase via
- * PBKDF2 and held only in memory for the session — it is never written to disk,
+ * PBKDF2 and held only in memory for the session - it is never written to disk,
  * so the history is unreadable (even by this app) until the user unlocks it.
  *
  * Threat model & honest limits:
@@ -141,7 +141,7 @@ function makeHistory({ storage, cryptoObj } = {}) {
   async function getStops() { return (await read()).stops; }
   async function getTrips() { return (await read()).trips; }
 
-  // Wipe everything, including the salt — full reset, irreversible.
+  // Wipe everything, including the salt - full reset, irreversible.
   function clear() {
     store.removeItem(STORE_KEY);
     store.removeItem(SALT_KEY);

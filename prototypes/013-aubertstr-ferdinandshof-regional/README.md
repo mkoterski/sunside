@@ -1,6 +1,6 @@
-# SunSide — Test Case 3: Aubertstraße 17 → Ferdinandshof Bahnhof
+# SunSide - Test Case 3: Aubertstraße 17 → Ferdinandshof Bahnhof
 
-A self-contained, offline prototype for a **long-distance, multi-modal** trip — the first
+A self-contained, offline prototype for a **long-distance, multi-modal** trip - the first
 SunSide case that leaves the Berlin network and runs on regional rail.
 
 ## Verified route (corrected)
@@ -24,16 +24,16 @@ Per-segment bearings and distances are computed from those stations' coordinates
 
 It exercises behaviour the urban tram cases never reach:
 
-- **Mode-aware suppression** — the Bus 154 hop and the S2 link are marked *"no sun-side
+- **Mode-aware suppression** - the Bus 154 hop and the S2 link are marked *"no sun-side
   call"* (too short / too built-up). The recommendation only speaks on the open RE3.
-- **Geometry-driven confidence** — the RE3 is mostly northbound but weaves between NE and
+- **Geometry-driven confidence** - the RE3 is mostly northbound but weaves between NE and
   NW (bearings 320°–57° across its segments). That makes the call:
   - **morning** → shade LEFT, 100% (unanimous, high confidence)
   - **evening** → shade RIGHT, 100% (unanimous, high confidence) ← the screenshot's trip
   - **midday** → *mixed*: sit LEFT for 88 of 145 km, with the NW-curving segments
     (Eberswalde→Britz, Angermünde→Prenzlau, the Pasewalk→Ferdinandshof tail) flipping to
     RIGHT. The spine marks every switch.
-- **Inferred interchange** — Gesundbrunnen is inferred from the trip, with no explicit
+- **Inferred interchange** - Gesundbrunnen is inferred from the trip, with no explicit
   direction/station picker (consistent with the locked-in UX).
 
 ## What's real vs. prototype
@@ -45,7 +45,7 @@ It exercises behaviour the urban tram cases never reach:
 
 ## Run it
 
-Open `index.html` — no build, no network, no dependencies. Toggle the time row to watch
+Open `index.html` - no build, no network, no dependencies. Toggle the time row to watch
 confidence go High → Mixed → High; tap **▶ Follow the ride** to advance segment by segment
 (source badge flips clock→GPS once moving; the last stop lands on Anni's stop).
 
