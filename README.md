@@ -1,4 +1,4 @@
-# SunSide Berlin - v0.16
+# SunSide Berlin - v0.17
 
 **Status:** DEVELOPMENT
 **Versioning:** `v0.x` = development/testing, `v1.x` = production-ready
@@ -106,7 +106,9 @@ Worker - but two things still work:
 
 | | |
 |---|---|
-| Nearby departures | Geolocation (rounded to ~110 m so nearby users share cache keys) fans out to the 4 closest stops, merged into one live board with delays |
+| Nearby departures | Geolocation (rounded to ~110 m so nearby users share cache keys) fans out to the 4 closest stops, merged into one live board with delays. One card per line and direction, so overlapping stops cannot crowd a line off the list; each card shows the walk to its boarding stop |
+| Transport filter | Chips above the board for S-Bahn / U-Bahn / Tram / Bus, multi-select, persisted. Counts come from the unfiltered board, so a chip says what picking it gives you. Filtering is client-side, so every combination shares one proxy cache key |
+| Refresh | Re-reads the GPS fix, not just the board. The location label prints the coordinates, accuracy and time of the fix, so a refresh is visibly a new one |
 | Demo mode | A fixed Hugenottenplatz location for trying the flow without granting geolocation |
 | Exit picker | The trip's real stopover list, boarding stop marked, each later stop tappable |
 | Sun-side verdict | Sit left / sit right / neutral, with the sun's azimuth and elevation, computed per segment and distance-weighted |
@@ -133,6 +135,17 @@ History before v0.10 predates the numbering and is archived by date.
 ### Changelog
 
 ```
+v0.17  2026-09-21  Fixed: Refresh never re-read the GPS - it reused the fix
+                   from the first permission grant, so departures stayed at
+                   the start point. Fixed: the board deduped by line+direction
+                   +stop and then cut to the 14 soonest, so overlapping nearby
+                   stops spent slots on duplicates and whole lines vanished
+                   (M13 towards S Warschauer Str. at Schönhauser Allee/
+                   Bornholmer Str.). Now one card per line+direction from the
+                   nearest stop serving it, cap 20, 12 departures per board.
+                   Added: transport-type filter chips (F5), walk distance per
+                   card, and the GPS fix shown in the location label (F4).
+
 v0.16  2026-09-01  Fixed: during a VBB outage the app hung on the loading
                    screen indefinitely, which on a phone reads as "app broken".
                    Root cause: no timeout anywhere in the chain - a downed VBB
@@ -222,6 +235,8 @@ Decided or built, kept here so the IDs are not reused.
 | F1 | 2026-09-01 | Landed in v0.11 as a DE/EN toggle in the header, German default, persisted in `localStorage`. |
 | F2 | 2026-09-01 | Landed in v0.13: encrypted history integrated as an opt-in card on the start screen, saves on every verdict, surfaces "recent" tags. One honest caveat from the module's own threat model stands: the app is one inline script, so the CSP hardening the module recommends against XSS is not in place yet - the encryption at rest is real either way. |
 | F3 | 2026-09-01 | Landed in v0.15: follow-the-ride journey screen per [`docs/design-handoff-v2a.md`](docs/design-handoff-v2a.md) §4. Clock/radar-driven; the replay button animates the ride once more after arrival. With this, the whole v2A handoff is implemented. |
+| F4 | 2026-09-21 | Landed in v0.17: Refresh re-acquires the GPS position (`maximumAge:0`), and the location label prints the fix - coordinates, accuracy, time - so the refresh is visible. A failed re-read keeps the previous fix and says so rather than dropping the board. |
+| F5 | 2026-09-21 | Landed in v0.17: transport-type filter chips, multi-select, persisted in `localStorage`. Client-side on purpose - the boards are always fetched with every product enabled, so all filter combinations share one proxy cache key instead of minting an upstream request per combination. |
 
 ### Architecture upgrades
 
@@ -256,8 +271,9 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.16`, DEVELOPMENT. The full loop works end to end against live
+Prototype, `v0.17`, DEVELOPMENT. The full loop works end to end against live
 data: departures → exit stop → verdict with route spine and shade meter →
-follow-the-ride, with live radar, the best-departure finder and opt-in
-encrypted history, in German and English, deployed at the URL above. Verified
-in one desktop browser. The v2A design handoff is fully implemented.
+follow-the-ride, with live radar, the best-departure finder, the transport
+filter and opt-in encrypted history, in German and English, deployed at the
+URL above. Verified in one desktop browser. The v2A design handoff is fully
+implemented.

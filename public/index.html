@@ -114,6 +114,10 @@ header{
 .sec-sub{font-size:var(--xs);color:var(--faint);margin-top:2px}
 .refresh-btn{font-size:var(--xs);color:var(--accent);font-weight:700;padding:var(--sp1) var(--sp2);border-radius:var(--r-sm);flex-shrink:0}
 .refresh-btn:hover{background:var(--accent-bg)}
+/* The fix line sits below the header rather than inside it: squeezed next to
+   the Refresh button it wrapped to four lines on a 375 px phone. */
+.fix-line{font-size:var(--xs);color:var(--faint);font-variant-numeric:tabular-nums;
+  margin:calc(-1 * var(--sp3)) 0 var(--sp3)}
 
 /* ── State view ── */
 .state-view{display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -165,7 +169,25 @@ header{
 .ls{background:var(--sbahn)}.lu{background:var(--ubahn)}.lt{background:var(--tram)}.lb{background:var(--bus)}.lr{background:var(--regional)}
 .dep-info{flex:1;min-width:0}
 .dep-dest{font-size:var(--sm);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dep-stop{font-size:var(--xs);color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dep-stop{font-size:var(--xs);color:var(--muted);margin-top:2px;display:flex;gap:4px;min-width:0}
+/* The stop name truncates; the walk distance does not - it is the newer and
+   more decision-relevant half, and it is short. */
+.dep-stop .ds-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.dep-stop .ds-walk{flex-shrink:0;color:var(--faint);font-variant-numeric:tabular-nums}
+
+/* ── Product filter chips (F5) ── */
+.filter-row{display:flex;gap:var(--sp2);overflow-x:auto;padding:2px 0 var(--sp2);
+  margin-bottom:var(--sp1);scrollbar-width:none;-ms-overflow-style:none}
+.filter-row::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;min-height:34px;
+  padding:var(--sp1) var(--sp3);border-radius:var(--r-full);
+  background:var(--offset);color:var(--muted);border:1px solid transparent;
+  font-size:var(--xs);font-weight:700;white-space:nowrap}
+.chip:hover{color:var(--text)}
+.chip.on{background:var(--accent-bg);color:var(--accent);border-color:oklch(from var(--accent) l c h/.35)}
+.chip[disabled]{opacity:.35;cursor:default;pointer-events:none}
+.chip .cdot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.chip .cnum{font-variant-numeric:tabular-nums;opacity:.75}
 
 /* ── Live indicator ── */
 .live-badge{
@@ -441,6 +463,8 @@ button:focus-visible,.dep-card:focus-visible,.stop-item:focus-visible{outline:2p
       </div>
       <button class="refresh-btn" onclick="doRefresh()" data-i18n="refresh">↻ Refresh</button>
     </div>
+    <div class="fix-line" id="fix-label"></div>
+    <div class="filter-row" id="filter-row"></div>
     <div class="dep-list" id="dep-list"></div>
   </div>
 </div>
@@ -518,6 +542,15 @@ de:{
   loadFailed:'Laden fehlgeschlagen. Prüfe deine Verbindung.',
   srcDown:'Die VBB-Datenquelle antwortet gerade nicht. Das kommt vor - versuch es in ein paar Minuten noch einmal.',
   stopsWithin:n=>`${n} Haltestellen im Umkreis von 700 m`,
+  gpsFix:(coords,acc,tm)=>acc!=null?`${coords} ±${acc} m · ${tm}`:`${coords} · ${tm}`,
+  demoLoc:'Demo-Standort',
+  gpsStale:'Standort nicht aktualisierbar - letzte Position',
+  filterAll:'Alle', filterSbahn:'S-Bahn', filterUbahn:'U-Bahn',
+  filterTram:'Tram', filterBus:'Bus',
+  filterAria:p=>`Nur ${p} anzeigen`, filterAllAria:'Alle Verkehrsmittel anzeigen',
+  noDepsFilter:'Für diesen Filter fährt gerade nichts ab.',
+  filterShowAll:'Alle Verkehrsmittel zeigen',
+  walkAway:m=>`${m} m`,
   noDeps:'Keine Abfahrten',
   noDepsText:'In den nächsten 35 Minuten fährt hier nichts ab.',
   fromStop:s=>`ab ${s}`,
@@ -595,6 +628,15 @@ en:{
   loadFailed:'Failed to load. Check connection.',
   srcDown:'The VBB data source is not responding right now. It happens - try again in a few minutes.',
   stopsWithin:n=>`${n} stops within 700 m`,
+  gpsFix:(coords,acc,tm)=>acc!=null?`${coords} ±${acc} m · ${tm}`:`${coords} · ${tm}`,
+  demoLoc:'Demo location',
+  gpsStale:'Could not refresh location - last known position',
+  filterAll:'All', filterSbahn:'S-Bahn', filterUbahn:'U-Bahn',
+  filterTram:'Tram', filterBus:'Bus',
+  filterAria:p=>`Show ${p} only`, filterAllAria:'Show all transport types',
+  noDepsFilter:'Nothing departing for this filter right now.',
+  filterShowAll:'Show all transport types',
+  walkAway:m=>`${m} m`,
   noDeps:'No departures',
   noDepsText:'Nothing departing nearby in the next 35 min.',
   fromStop:s=>`from ${s}`,
@@ -757,8 +799,14 @@ function histSaveTrip(dep,fromStop,toStop){
 // directly. Testing-only: that path shares VBB's global 100 req/min bucket.
 const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
   ||(typeof location!=='undefined'&&location.hostname.endsWith('github.io')?'https://v6.vbb.transport.rest':'/api');
-console.log('SunSide Berlin v0.16 - API base:',API);
+console.log('SunSide Berlin v0.17 - API base:',API);
 let uLat=null,uLon=null;
+// How the current position was obtained, and the fix itself. Refresh re-reads
+// the GPS, so these change under the user - the location label prints them.
+let locSource=null;   // 'gps' | 'demo' | null
+let locAcc=null;      // metres, from the Geolocation API
+let locAt=null;       // Date of the fix
+let locStale=false;   // a re-read failed and we are still on the previous fix
 let allDeps=[];
 let selDep=null;
 let selTrip=null;
@@ -796,17 +844,31 @@ function updateSunBar(lat,lon,when){
 setInterval(()=>{if(uLat)updateSunBar(uLat,uLon,sunBarWhen)},60000);
 
 // ── Location ──────────────────────────────────────────
+// maximumAge:0 is stated rather than left to the default: the spec default is
+// already 0, but several mobile browsers hand back a minutes-old cached fix
+// when the option is absent, which is exactly what a refresh must not do.
+const GEO_OPTS={timeout:10000,enableHighAccuracy:true,maximumAge:0};
+
+// The single place a position becomes the app's position.
+function applyFix(p){
+  uLat=p.coords.latitude;uLon=p.coords.longitude;
+  locAcc=p.coords.accuracy!=null?Math.round(p.coords.accuracy):null;
+  locAt=new Date(p.timestamp||Date.now());
+  locSource='gps';locStale=false;
+  updateSunBar(uLat,uLon);
+}
 function requestLocation(){
   show('scr-load');
   navigator.geolocation.getCurrentPosition(
-    p=>{uLat=p.coords.latitude;uLon=p.coords.longitude;updateSunBar(uLat,uLon);loadDeps()},
+    p=>{applyFix(p);loadDeps()},
     ()=>{alert(t('locDenied'));useDemo()},
-    {timeout:10000,enableHighAccuracy:true}
+    GEO_OPTS
   );
 }
 function useDemo(){
   // Hugenottenplatz area (Wedding/Mitte, Bus 50 territory)
   uLat=52.5435;uLon=13.3470;
+  locSource='demo';locAcc=null;locAt=null;locStale=false;
   updateSunBar(uLat,uLon);
   show('scr-load');
   loadDeps();
@@ -829,25 +891,23 @@ async function loadDeps(){
     if(!nr.length){showErr(t('noStopsNearby'));return}
     lastStopCount=nr.length;setLocLabel();
 
-    // Fan out to 4 stops (was 6). At 4 deps/stop that is still plenty of choice
-    // while cutting upstream load by a third per session.
+    // Fan out to 4 stops (was 6). At 4 stops that is still plenty of choice
+    // while cutting upstream load by a third per session. results=12 (was 8):
+    // request COUNT is what the egress budget limits, not response size, so a
+    // longer board per request is free - and it is what makes per-line
+    // coverage and the product filter usable at a busy interchange.
+    // Every product is requested regardless of the filter, so all filter
+    // combinations share one proxy cache key instead of minting a new upstream
+    // request each; the filter then applies client-side, instantly.
     const proms=nr.slice(0,4).map(s=>
-      apiFetch(`${API}/stops/${s.id}/departures?duration=35&results=8&bus=true&suburban=true&subway=true&tram=true&ferry=false&express=false&regional=false`)
+      apiFetch(`${API}/stops/${s.id}/departures?duration=35&results=12&bus=true&suburban=true&subway=true&tram=true&ferry=false&express=false&regional=false`)
         .then(r=>r.json())
-        .then(d=>(d.departures||[]).map(x=>({...x,_sId:s.id,_sName:s.name})))
+        .then(d=>(d.departures||[]).map(x=>({...x,_sId:s.id,_sName:s.name,_sDist:s.distance??null})))
         .catch(()=>[])
     );
-    let deps=(await Promise.all(proms)).flat();
-    deps.sort((a,b)=>new Date(a.when||a.plannedWhen)-new Date(b.when||b.plannedWhen));
+    const deps=(await Promise.all(proms)).flat();
 
-    // Deduplicate by line+direction+stop
-    const seen=new Set();
-    deps=deps.filter(d=>{
-      const k=`${d.line?.name}|${d.direction}|${d._sId}`;
-      if(seen.has(k))return false;seen.add(k);return true;
-    });
-
-    allDeps=deps.slice(0,14);
+    allDeps=pickPerLineDir(deps,20);
     renderDeps(allDeps);
     show('scr-deps');
   }catch(e){
@@ -858,16 +918,115 @@ async function loadDeps(){
   }
 }
 let lastStopCount=0;
-function setLocLabel(){document.getElementById('loc-label').textContent=t('stopsWithin')(lastStopCount)}
+
+function depMs(d){return new Date(d.when||d.plannedWhen).getTime()}
+
+// One card per line + direction, not per line + direction + stop.
+//
+// Nearby stops overlap, so the same M13 towards S Warschauer Str. appears on
+// two boards 200 m apart and each copy consumed a slot in a list that was then
+// cut to the 14 soonest departures. Measured at Schoenhauser Allee/Bornholmer
+// Str.: six of fourteen slots were duplicates, and whole lines - M13 towards
+// Warschauer Str. among them - fell off the end and could not be chosen at
+// all. Grouping first guarantees every distinct line + direction nearby gets a
+// card before any of them gets a second one.
+//
+// Representative departure = the one at the NEAREST stop serving that pair,
+// earliest there. Nearest, not soonest: a departure a minute earlier 400 m
+// away is not something a rider can actually catch.
+function pickPerLineDir(deps,cap){
+  const best=new Map();
+  for(const d of deps){
+    const key=`${d.line?.name}|${d.direction}`;
+    const cur=best.get(key);
+    if(!cur){best.set(key,d);continue}
+    const dDist=d._sDist??Infinity, cDist=cur._sDist??Infinity;
+    if(dDist<cDist||(dDist===cDist&&depMs(d)<depMs(cur)))best.set(key,d);
+  }
+  return [...best.values()].sort((a,b)=>depMs(a)-depMs(b)).slice(0,cap);
+}
+
+// The label under "Nearby departures". It prints the actual fix - coordinates,
+// accuracy and the time it was taken - so a refresh is visibly a new fix
+// rather than something the user has to take on trust.
+function setLocLabel(){
+  document.getElementById('loc-label').textContent=t('stopsWithin')(lastStopCount);
+  const bits=[];
+  if(locSource==='demo'){
+    bits.push(t('demoLoc'));
+  } else if(locAt){
+    const coords=`${uLat.toFixed(4)}, ${uLon.toFixed(4)}`;
+    bits.push(t('gpsFix')(coords,locAcc,
+      locAt.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit',second:'2-digit'})));
+  }
+  if(locStale)bits.push(t('gpsStale'));
+  document.getElementById('fix-label').textContent=bits.join(' · ');
+}
+
+// ── Product filter (F5) ──────────────────────
+// Client-side by design: see the cache-key note in loadDeps. An empty list
+// means "everything", which is also the state a fresh install starts in.
+const PRODUCTS=[
+  {key:'suburban',lbl:'filterSbahn',cls:'ls'},
+  {key:'subway',  lbl:'filterUbahn',cls:'lu'},
+  {key:'tram',    lbl:'filterTram', cls:'lt'},
+  {key:'bus',     lbl:'filterBus',  cls:'lb'},
+];
+let prodFilter=(function(){
+  try{
+    const raw=JSON.parse(localStorage.getItem('sunside/products'));
+    if(Array.isArray(raw))return raw.filter(k=>PRODUCTS.some(p=>p.key===k));
+  }catch(e){}
+  return [];
+})();
+function toggleProd(key){
+  prodFilter=key===null?[]
+    :prodFilter.includes(key)?prodFilter.filter(k=>k!==key)
+    :prodFilter.concat(key);
+  try{localStorage.setItem('sunside/products',JSON.stringify(prodFilter))}catch(e){}
+  renderDeps(allDeps);
+}
+function filterDeps(deps){
+  return prodFilter.length?deps.filter(d=>prodFilter.includes(d.line?.product)):deps;
+}
+// Counts come from the UNFILTERED board, so a chip always says what picking it
+// would give you - including nothing, which disables it rather than hiding it.
+function renderFilterRow(deps){
+  const row=document.getElementById('filter-row');
+  if(!row)return;
+  const counts={};
+  for(const d of deps){const p=d.line?.product;if(p)counts[p]=(counts[p]||0)+1}
+  const allOn=!prodFilter.length;
+  const chips=[`<button class="chip ${allOn?'on':''}" onclick="toggleProd(null)"
+    aria-pressed="${allOn}" aria-label="${t('filterAllAria')}">${t('filterAll')}
+    <span class="cnum">${deps.length}</span></button>`];
+  for(const p of PRODUCTS){
+    const n=counts[p.key]||0, on=prodFilter.includes(p.key);
+    chips.push(`<button class="chip ${on?'on':''}" onclick="toggleProd('${p.key}')"
+      aria-pressed="${on}" aria-label="${t('filterAria')(t(p.lbl))}"${n?'':' disabled'}>
+      <span class="cdot ${p.cls}"></span>${t(p.lbl)} <span class="cnum">${n}</span></button>`);
+  }
+  row.innerHTML=chips.join('');
+}
 
 function badgeClass(p){
   return p==='suburban'?'ls':p==='subway'?'lu':p==='tram'?'lt':p==='bus'?'lb':'lr';
 }
 
 function renderDeps(deps){
+  renderFilterRow(deps);
   const el=document.getElementById('dep-list');
   if(!deps.length){el.innerHTML=`<div class="state-view"><div class="sv-icon">🚉</div><h2>${t('noDeps')}</h2><p>${t('noDepsText')}</p></div>`;return}
-  el.innerHTML=deps.map((d,i)=>{
+  const shown=filterDeps(deps);
+  if(!shown.length){
+    el.innerHTML=`<div class="state-view"><div class="sv-icon">🚏</div><h2>${t('noDeps')}</h2><p>${t('noDepsFilter')}</p>
+      <button class="btn btn-ghost" onclick="toggleProd(null)" style="margin-top:var(--sp4)">${t('filterShowAll')}</button></div>`;
+    return;
+  }
+  el.innerHTML=shown.map((d,i)=>{
+    // selectDep() indexes allDeps, so a filtered row must carry its index in
+    // the FULL list - not its position in the filtered one.
+    const gi=deps.indexOf(d);
     const prod=d.line?.product;
     const name=d.line?.name||'?';
     const dest=d.direction||'?';
@@ -878,12 +1037,15 @@ function renderDeps(deps){
     const delay=d.delay?Math.round(d.delay/60):0;
     const delayTag=delay>0?`<div class="delay-tag">+${delay} min</div>`:'';
     const liveTag=d.when&&d.delay!==null?'<span class="live-badge"><span class="live-dot"></span>LIVE</span>':'';
+    // How far the boarding stop is. Cards can now come from different stops
+    // than the nearest one, so the walk is part of the decision.
+    const walk=d._sDist!=null?`<span class="ds-walk">· ${t('walkAway')(d._sDist)}</span>`:'';
     return `
-    <div class="dep-card anim" style="animation-delay:${i*35}ms" onclick="selectDep(${i})" tabindex="0" role="button">
+    <div class="dep-card anim" style="animation-delay:${i*35}ms" onclick="selectDep(${gi})" tabindex="0" role="button">
       <div class="line-badge ${badgeClass(prod)}">${esc(name)}</div>
       <div class="dep-info">
         <div class="dep-dest">${esc(dest)}${histMatches(name,dest)?recentTag():''}</div>
-        <div class="dep-stop">${t('fromStop')(esc(d._sName))}</div>
+        <div class="dep-stop"><span class="ds-name">${t('fromStop')(esc(d._sName))}</span>${walk}</div>
         ${liveTag}${delayTag}
       </div>
       <div class="dep-time-block">
@@ -1513,10 +1675,28 @@ function show(id){
   }
 }
 function showErr(msg){
+  document.getElementById('filter-row').innerHTML='';
+  document.getElementById('fix-label').textContent='';
   document.getElementById('dep-list').innerHTML=`<div class="state-view"><div class="sv-icon">⚠️</div><h2>${t('error')}</h2><p>${msg}</p><button class="btn btn-ghost" onclick="show('scr-perm')" style="margin-top:var(--sp4)">${t('startOver')}</button></div>`;
   show('scr-deps');
 }
-function doRefresh(){if(uLat){show('scr-load');updateSunBar(uLat,uLon);loadDeps()}}
+// Refresh re-reads the GPS fix; it does not merely re-fetch the board. Up to
+// v0.16 it reused the coordinates captured at the first permission grant, so a
+// rider who had walked on kept getting departures for where they started - and
+// nothing on screen revealed that the position had not moved. Demo mode has no
+// fix to re-read, so it only reloads.
+function doRefresh(){
+  if(!uLat)return;
+  show('scr-load');
+  if(locSource!=='gps'||!navigator.geolocation){updateSunBar(uLat,uLon);loadDeps();return}
+  navigator.geolocation.getCurrentPosition(
+    p=>{applyFix(p);loadDeps()},
+    // A failed re-read is no reason to lose the board: keep the previous fix,
+    // say so in the label, and reload with it.
+    ()=>{locStale=true;loadDeps()},
+    GEO_OPTS
+  );
+}
 
 // v2A a11y: card rows carry role="button" + tabindex, so Enter/Space must
 // activate them like a real button. One delegated listener, not per-card.

@@ -143,5 +143,48 @@ eq(clockIdx(ARR, T0 + 60 * 60000), 3, "long past the end -> exit stop, no overru
 eq(clockIdx([null, null, "2026-09-01T15:06:00Z", null], T0 + 7 * 60000), 2,
   "missing arrivals are skipped, not advanced past");
 
+// -- v0.17: one departure card per line + direction ---------------------------
+// Mirror of the app's pickPerLineDir: overlapping nearby stops must not spend
+// two list slots on the same line + direction, and the survivor is the one at
+// the stop the rider can actually walk to.
+function depMs(d) { return new Date(d.when || d.plannedWhen).getTime(); }
+function pickPerLineDir(deps, cap) {
+  const best = new Map();
+  for (const d of deps) {
+    const key = `${d.line?.name}|${d.direction}`;
+    const cur = best.get(key);
+    if (!cur) { best.set(key, d); continue; }
+    const dDist = d._sDist ?? Infinity, cDist = cur._sDist ?? Infinity;
+    if (dDist < cDist || (dDist === cDist && depMs(d) < depMs(cur))) best.set(key, d);
+  }
+  return [...best.values()].sort((a, b) => depMs(a) - depMs(b)).slice(0, cap);
+}
+const dep = (name, dir, when, dist) =>
+  ({ line: { name }, direction: dir, when, _sDist: dist });
+
+// The reported case: M13 towards S Warschauer Str. is on two boards 200 m
+// apart. Before v0.17 both copies were kept and whole lines fell off the cap.
+const BOARD = [
+  dep("M1", "Bjoernsonstr.", "2026-09-21T14:47:00+02:00", 112),
+  dep("M1", "Bjoernsonstr.", "2026-09-21T14:47:00+02:00", 289),
+  dep("M13", "S Warschauer Str.", "2026-09-21T14:51:00+02:00", 289),
+  dep("M13", "S Warschauer Str.", "2026-09-21T14:52:00+02:00", 112),
+  dep("250", "U Franz-Neumann-Platz", "2026-09-21T14:56:00+02:00", 615),
+];
+const picked = pickPerLineDir(BOARD, 20);
+eq(picked.length, 3, "overlapping stops collapse to one card per line+direction");
+eq(picked.filter(d => d.line.name === "M13").length, 1, "no duplicate M13 card");
+eq(picked.find(d => d.line.name === "M13")._sDist, 112,
+  "the surviving M13 is the one at the nearest stop, not the soonest");
+eq(picked[picked.length - 1].line.name, "250",
+  "a line that used to fall off the cap now has a card");
+eq(picked.map(d => depMs(d)).every((ms, i, a) => i === 0 || a[i - 1] <= ms), true,
+  "cards stay ordered by departure time");
+eq(pickPerLineDir(BOARD, 2).length, 2, "cap is honoured");
+// Stops missing a distance must not win over stops that have one.
+eq(pickPerLineDir([dep("U2", "Pankow", "2026-09-21T14:49:00+02:00", undefined),
+                   dep("U2", "Pankow", "2026-09-21T14:50:00+02:00", 538)], 20)[0]._sDist, 538,
+  "an unknown stop distance loses to a known one");
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
