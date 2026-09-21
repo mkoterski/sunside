@@ -175,6 +175,15 @@ header{
 .dep-stop .ds-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .dep-stop .ds-walk{flex-shrink:0;color:var(--faint);font-variant-numeric:tabular-nums}
 
+/* ── Data-source attribution (F6) ── */
+/* Transitous asks for a visible link to their sources page wherever their
+   data is used. It only appears when MOTIS actually served the screen. */
+.attrib{display:none;padding:var(--sp3) var(--sp5) var(--sp5);
+  font-size:var(--xs);color:var(--faint);text-align:center;line-height:1.5}
+.attrib.on{display:block}
+.attrib a{color:var(--muted);text-decoration:underline;text-underline-offset:2px}
+.attrib a:hover{color:var(--accent)}
+
 /* ── Product filter chips (F5) ── */
 .filter-row{display:flex;gap:var(--sp2);overflow-x:auto;padding:2px 0 var(--sp2);
   margin-bottom:var(--sp1);scrollbar-width:none;-ms-overflow-style:none}
@@ -502,6 +511,9 @@ button:focus-visible,.dep-card:focus-visible,.stop-item:focus-visible{outline:2p
 </div>
 
 </main>
+
+<!-- Shown only when Transitous/MOTIS served the data (F6). -->
+<div class="attrib" id="attrib"></div>
 </div>
 
 <script src="history.js"></script>
@@ -546,7 +558,8 @@ de:{
   demoLoc:'Demo-Standort',
   gpsStale:'Standort nicht aktualisierbar - letzte Position',
   filterAll:'Alle', filterSbahn:'S-Bahn', filterUbahn:'U-Bahn',
-  filterTram:'Tram', filterBus:'Bus',
+  filterTram:'Tram', filterBus:'Bus', filterRegional:'Regional',
+  attribMotis:'Fahrplandaten über <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous</a> (DELFI, Deutschland-weit). Außerhalb von Berlin/Brandenburg keine Live-Fahrzeugortung.',
   filterAria:p=>`Nur ${p} anzeigen`, filterAllAria:'Alle Verkehrsmittel anzeigen',
   noDepsFilter:'Für diesen Filter fährt gerade nichts ab.',
   filterShowAll:'Alle Verkehrsmittel zeigen',
@@ -632,7 +645,8 @@ en:{
   demoLoc:'Demo location',
   gpsStale:'Could not refresh location - last known position',
   filterAll:'All', filterSbahn:'S-Bahn', filterUbahn:'U-Bahn',
-  filterTram:'Tram', filterBus:'Bus',
+  filterTram:'Tram', filterBus:'Bus', filterRegional:'Regional',
+  attribMotis:'Schedule data via <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous</a> (DELFI, Germany-wide). No live vehicle positions outside Berlin/Brandenburg.',
   filterAria:p=>`Show ${p} only`, filterAllAria:'Show all transport types',
   noDepsFilter:'Nothing departing for this filter right now.',
   filterShowAll:'Show all transport types',
@@ -712,6 +726,7 @@ function applyLang(){
   lbtn.setAttribute('aria-label',t('langAria'));
   document.getElementById('theme-toggle').setAttribute('aria-label',t('themeAria'));
   renderHistCard();
+  renderAttrib();
   const active=document.querySelector('.screen.active')?.id;
   if(active==='scr-deps'&&allDeps.length){renderDeps(allDeps);setLocLabel()}
   if(active==='scr-stops'&&selDep){renderJourneyCard();renderVehicleStrip(radarVehicle);renderStops(selTrip)}
@@ -792,14 +807,19 @@ function histSaveTrip(dep,fromStop,toStop){
 
 // ── State ──────────────────────────────────────────────
 // API base is configurable. By default it points at the local proxy path "/api",
-// which the Cloudflare Worker serves (cache + single-flight in front of VBB).
-// To bypass the proxy during local dev, set window.SUNSIDE_API before this script,
-// e.g. a separate script tag setting window.SUNSIDE_API='https://v6.vbb.transport.rest'
-// On GitHub Pages there is no Worker behind /api, so fall back to calling VBB
-// directly. Testing-only: that path shares VBB's global 100 req/min bucket.
+// which the Cloudflare Worker serves. Since v0.18 the Worker speaks to VBB's
+// HAFAS and to Transitous itself, so there is no longer a public REST upstream
+// a browser could call directly - a GitHub Pages copy therefore points at the
+// deployed Worker, which allows that origin explicitly in its CORS check.
 const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
-  ||(typeof location!=='undefined'&&location.hostname.endsWith('github.io')?'https://v6.vbb.transport.rest':'/api');
-console.log('SunSide Berlin v0.17 - API base:',API);
+  ||(typeof location!=='undefined'&&location.hostname.endsWith('github.io')
+      ?'https://sunside-berlin.mkoterski.workers.dev/api':'/api');
+console.log('SunSide Berlin v0.18 - API base:',API);
+
+// Which upstream served the current board: 'hafas' (VBB direct) or 'motis'
+// (Transitous). Drives the attribution footer, and explains to the rider why
+// live vehicle positions are missing outside Berlin/Brandenburg.
+let dataSource=null;
 let uLat=null,uLon=null;
 // How the current position was obtained, and the fix itself. Refresh re-reads
 // the GPS, so these change under the user - the location label prints them.
@@ -887,6 +907,10 @@ async function loadDeps(){
     const qLat=uLat.toFixed(3), qLon=uLon.toFixed(3);
     const resp=await apiFetch(`${API}/locations/nearby?latitude=${qLat}&longitude=${qLon}&distance=700&results=10`);
     if(!resp.ok){showErr(resp.status>=500?t('srcDown'):t('loadFailed'));return}
+    // The Worker names the upstream that answered. Everything downstream of
+    // this call follows the ids it returned, so one read here is enough.
+    dataSource=resp.headers.get('X-Data-Source')||null;
+    renderAttrib();
     const nr=await resp.json();
     if(!nr.length){showErr(t('noStopsNearby'));return}
     lastStopCount=nr.length;setLocLabel();
@@ -900,9 +924,10 @@ async function loadDeps(){
     // combinations share one proxy cache key instead of minting a new upstream
     // request each; the filter then applies client-side, instantly.
     const proms=nr.slice(0,4).map(s=>
-      apiFetch(`${API}/stops/${s.id}/departures?duration=35&results=12&bus=true&suburban=true&subway=true&tram=true&ferry=false&express=false&regional=false`)
+      apiFetch(`${API}/stops/${s.id}/departures?duration=35&results=12&bus=true&suburban=true&subway=true&tram=true&regional=true&ferry=false&express=false`)
         .then(r=>r.json())
-        .then(d=>(d.departures||[]).map(x=>({...x,_sId:s.id,_sName:s.name,_sDist:s.distance??null})))
+        .then(d=>(d.departures||[]).map(x=>({...x,_sId:s.id,_sName:s.name,_sDist:s.distance??null,
+          _sLat:s.location?.latitude??null,_sLon:s.location?.longitude??null})))
         .catch(()=>[])
     );
     const deps=(await Promise.all(proms)).flat();
@@ -963,14 +988,27 @@ function setLocLabel(){
   document.getElementById('fix-label').textContent=bits.join(' · ');
 }
 
+// ── Data-source attribution (F6) ─────────────────
+function renderAttrib(){
+  const el=document.getElementById('attrib');
+  if(!el)return;
+  const on=dataSource==='motis';
+  el.classList.toggle('on',on);
+  el.innerHTML=on?t('attribMotis'):'';
+}
+
 // ── Product filter (F5) ──────────────────────
 // Client-side by design: see the cache-key note in loadDeps. An empty list
 // means "everything", which is also the state a fresh install starts in.
+// Regional rail is included since v0.18: outside Berlin it is often the only
+// service on a route, and a 40-minute regional ride is exactly where the sun
+// side matters most.
 const PRODUCTS=[
   {key:'suburban',lbl:'filterSbahn',cls:'ls'},
   {key:'subway',  lbl:'filterUbahn',cls:'lu'},
   {key:'tram',    lbl:'filterTram', cls:'lt'},
   {key:'bus',     lbl:'filterBus',  cls:'lb'},
+  {key:'regional',lbl:'filterRegional',cls:'lr'},
 ];
 let prodFilter=(function(){
   try{
@@ -1112,7 +1150,7 @@ async function fetchTrip(tripId){
 async function fetchCandidateDeps(dep){
   if(!dep._sId)return [];
   try{
-    const params='duration=90&results=40&bus=true&suburban=true&subway=true&tram=true&ferry=false&express=false&regional=false';
+    const params='duration=90&results=40&bus=true&suburban=true&subway=true&tram=true&regional=true&ferry=false&express=false';
     const r=await apiFetch(`${API}/stops/${dep._sId}/departures?${params}`).then(r=>r.json());
     let list=(r.departures||[]).filter(d=>
       d.line?.name===dep.line?.name && d.direction===dep.direction);
@@ -1166,20 +1204,66 @@ function renderVehicleStrip(veh){
     </div>`;
 }
 
+// Where the rider actually boards, i.e. where to cut the trip's stop list.
+// Four rules, each covering a case the one before it gets wrong.
+//
+// 1. Stop id. Exact and cheap, and right whenever the board and the trip came
+//    from the same data source.
+// 2. SCHEDULED departure time. Ids fail in two real situations: DELFI
+//    aggregates several feeds, so a MOTIS trip can carry platform ids from a
+//    different feed than the board did; and HAFAS has master stations whose
+//    board lists services that physically stop a few hundred metres away
+//    (Cottbus Stadtpromenade lists a tram calling at August-Bebel-Str.).
+//    The timetable is the same document on both sides, so the scheduled time
+//    identifies the stop exactly. Scheduled, not live: a badly delayed
+//    vehicle gets a flat prognosis where HAFAS repeats one time for every
+//    remaining stop, which would match half the route.
+// 3. Coordinates, within 400 m - enough for a master station's spread, not so
+//    much that a genuinely different stop wins.
+// 4. Stop name, then give up and start at the trip's origin.
+//
+// Getting this wrong is not cosmetic: it offers stops the rider passed long
+// ago and computes the sun side over legs they will never travel.
+function boardingIndex(stopovers,dep){
+  const byId=stopovers.findIndex(s=>s.stop?.id&&s.stop.id===dep._sId);
+  if(byId>=0)return byId;
+
+  const target=Date.parse(dep.plannedWhen||dep.when||'');
+  if(Number.isFinite(target)){
+    const byTime=stopovers.findIndex(s=>{
+      const t=Date.parse(s.plannedDeparture||s.plannedArrival||'');
+      return Number.isFinite(t)&&Math.abs(t-target)<=60000;
+    });
+    if(byTime>=0)return byTime;
+  }
+
+  if(dep._sLat!=null&&dep._sLon!=null){
+    let best=-1,bestKm=Infinity;
+    stopovers.forEach((s,i)=>{
+      const l=s.stop?.location;
+      if(!l||l.latitude==null)return;
+      const km=haversine(dep._sLat,dep._sLon,l.latitude,l.longitude);
+      if(km<bestKm){bestKm=km;best=i}
+    });
+    if(best>=0&&bestKm<=0.4)return best;
+  }
+
+  const byName=stopovers.findIndex(s=>s.stop?.name===dep._sName);
+  return byName>=0?byName:0;
+}
+
 // ── Render stops ───────────────────────────────────────
 function renderStops(trip){
   const list=document.getElementById('stops-list');
   let stops=[];
   if(trip?.stopovers){
-    stops=trip.stopovers.map(s=>({
+    stops=trip.stopovers.slice(boardingIndex(trip.stopovers,selDep)).map(s=>({
       id:s.stop?.id,
       name:s.stop?.name,
       arrival:s.arrival||s.plannedArrival,
       lat:s.stop?.location?.latitude,
       lon:s.stop?.location?.longitude,
     }));
-    const fi=stops.findIndex(s=>s.id===selDep._sId);
-    if(fi>=0)stops=stops.slice(fi);
   }
   if(!stops.length)stops=[{id:'dest',name:selDep.direction||'Final stop',arrival:null}];
 
@@ -1382,7 +1466,11 @@ function renderResult(trainBearing,sunAz,sunEl,dest,origin,src,flipStop){
   const srcStr=src.key==='segments'?t('src').segments(src.n):t('src')[src.key];
   const warn=elLow?`<div class="warn"><span class="warn-icon">⚠️</span><span>${t('warnLow')(sunEl.toFixed(0))}</span></div>`:'';
   const flip=flipStop?`<div class="warn"><span class="warn-icon">↪️</span><span>${t('flipNote')(esc(flipStop))}</span></div>`:'';
-  const radar=(radarActive&&radarVehicle)?`<div class="warn" style="background:var(--left-bg);border-color:var(--left-border)"><span class="warn-icon">📡</span><span>${t('radarNote')}</span></div>`:'';
+  // Tied to the bearing SOURCE, not merely to having located a vehicle. Since
+  // v0.18 the radar reports a position but no heading, so claiming the bearing
+  // came from live GPS would be false on every ride. Keying off src also means
+  // the note returns by itself if a provider starts supplying headings again.
+  const radar=(src.key==='liveGps')?`<div class="warn" style="background:var(--left-bg);border-color:var(--left-border)"><span class="warn-icon">📡</span><span>${t('radarNote')}</span></div>`:'';
 
   document.getElementById('result-wrap').innerHTML=`
     <div class="result-card ${cardClass}">

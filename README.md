@@ -1,10 +1,12 @@
-# SunSide Berlin - v0.17
+# SunSide Berlin - v0.18
 
 **Status:** DEVELOPMENT
 **Versioning:** `v0.x` = development/testing, `v1.x` = production-ready
 
-Tells a Berlin transit rider which side of the vehicle (left or right, relative
-to direction of travel) stays in the shade. Pick a departure near you, say where
+Tells a transit rider which side of the vehicle (left or right, relative to
+direction of travel) stays in the shade. Berlin and Brandenburg run on VBB's
+own data; the rest of Germany, Mecklenburg-Vorpommern included, runs on
+Transitous. Pick a departure near you, say where
 you get off, and the app answers with one sentence: sit on the left, or the
 right. Mobile-first single-page app backed by an edge-cached proxy in front of
 the public VBB API, sized for **10-100 concurrent users at zero cost**.
@@ -17,8 +19,8 @@ the public VBB API, sized for **10-100 concurrent users at zero cost**.
 |---|---|
 | `public/index.html` | the SPA - THIS is the canonical, deployed app |
 | `public/history.js` | encrypted local journey history (F2); see [`docs/encrypted-history.md`](docs/encrypted-history.md) |
-| `worker/src/index.js` | Cloudflare Worker: caching proxy + single-flight + budget |
-| `test/` | pure-logic tests: sun-side maths, history module crypto |
+| `worker/src/index.js` | Cloudflare Worker: two upstreams (VBB HAFAS, Transitous), normalised to one API, with caching + single-flight + budget |
+| `test/` | pure-logic tests: sun-side maths, history module crypto, provider parsing |
 | `wrangler.toml` | one Worker serves BOTH the SPA and `/api/*` |
 | `prototypes/` | numbered self-contained offline prototypes; `prototypes/index.html` is the hub |
 | `docs/` | design brief, encrypted-history threat model, supporting notes |
@@ -49,10 +51,12 @@ bug), add one line before the main script in `public/index.html`:
 npm test
 ```
 
-Two suites, no dependencies: the bearing maths and sun-side classification
-(including a curved-route flip scenario), and the encrypted history module
+Three suites, no dependencies: the bearing maths and sun-side classification
+(including a curved-route flip scenario); the encrypted history module
 (round-trip, wrong-passphrase rejection, no plaintext at rest, dedup, cap,
-wipe, KDF floor). Should pass before any commit.
+wipe, KDF floor); and the provider layer (stop-id shapes across feeds, HAFAS
+time parsing across both DST switches, and the four boarding-stop rules).
+Should pass before any commit.
 
 ## Deploy
 
@@ -82,11 +86,13 @@ Worker - but two things still work:
 
 - **One canonical client.** `public/index.html` holds the whole SPA - markup,
   CSS and JS. No build step, no framework, no dependencies.
-- **A proxy, because the upstream limit is shared.** The public VBB instance
-  (`v6.vbb.transport.rest`) allows 100 req/min globally, keyed by IP. If every
-  browser called it directly, a heatwave crowd would exhaust that bucket and
-  everyone would get 429'd. The Worker is the only client talking to VBB, so
-  the limit is managed centrally:
+- **The Worker talks to the data sources itself.** It speaks VBB's HAFAS
+  protocol and Transitous' REST API directly and normalises both to one shape,
+  so the SPA is provider-agnostic and a bad day at one upstream is not a bad
+  day for the app. Stop and trip ids are namespaced (`h~` / `m~`) and
+  round-trip through the client, which keeps follow-up calls on the provider
+  that issued them. Being the only client also means the load is managed
+  centrally:
   - *Per-endpoint caching* - stop locations for hours, departure boards ~25s,
     trip geometry ~120s, live radar ~8s.
   - *Single-flight coalescing* - N simultaneous misses for one key trigger one
@@ -116,7 +122,9 @@ Worker - but two things still work:
 | Shade meter | Distance-weighted km bar in the verdict card: shade-left / even / shade-right, each share paired with its number |
 | Follow the ride | Journey view reached from the verdict: pinned status card (current segment, shade side, clock-estimate vs live-GPS source), the spine with current/passed states, a vertical progress bar, auto-follow with pause, and a replay once arrived. Clock/radar-driven, not a demo timer |
 | Flip warning | When the shaded side genuinely changes mid-trip, the verdict says so instead of averaging it away |
-| Live radar | The actual vehicle's GPS position via VBB radar; its live bearing is preferred on single-leg rides |
+| Live radar | The actual vehicle's GPS position via VBB radar (Berlin + Brandenburg only). Position, not heading: HAFAS's radar call will not return a passlist, so the bearing comes from stop geometry - which is the better source on anything but a dead-straight single leg |
+| Coverage beyond Berlin | Mecklenburg-Vorpommern and the rest of Germany via Transitous, picked automatically from where you are, with a visible attribution line when it serves |
+| Regional rail | Included since v0.18 - outside Berlin it is often the only service on a route, and a 40-minute regional ride is where the sun side matters most |
 | Best-departure finder | Ranks the next departures of the same line by sun exposure - and says honestly when they barely differ |
 | Theme | Light/dark toggle |
 | Language | DE/EN toggle in the header, German default, persisted in `localStorage`. Static markup re-applies via `data-i18n`; the active screen re-renders, so nothing on screen stays behind |
@@ -135,6 +143,15 @@ History before v0.10 predates the numbering and is archived by date.
 ### Changelog
 
 ```
+v0.18  2026-09-21  The Worker now talks to VBB's HAFAS and to Transitous
+                   directly instead of proxying v6.vbb.transport.rest (F7/F8).
+                   Root cause of the recurring outages: that shared community
+                   instance, not VBB - measured in one minute, VBB's own HAFAS
+                   answered in 176 ms while the instance timed out after 12 s.
+                   Brings Mecklenburg-Vorpommern and the rest of Germany into
+                   scope via Transitous, plus regional rail and a data-source
+                   attribution line. Radar keeps positions but loses headings.
+
 v0.17  2026-09-21  Fixed: Refresh never re-read the GPS - it reused the fix
                    from the first permission grant, so departures stayed at
                    the start point. Fixed: the board deduped by line+direction
@@ -237,29 +254,58 @@ Decided or built, kept here so the IDs are not reused.
 | F3 | 2026-09-01 | Landed in v0.15: follow-the-ride journey screen per [`docs/design-handoff-v2a.md`](docs/design-handoff-v2a.md) §4. Clock/radar-driven; the replay button animates the ride once more after arrival. With this, the whole v2A handoff is implemented. |
 | F4 | 2026-09-21 | Landed in v0.17: Refresh re-acquires the GPS position (`maximumAge:0`), and the location label prints the fix - coordinates, accuracy, time - so the refresh is visible. A failed re-read keeps the previous fix and says so rather than dropping the board. |
 | F5 | 2026-09-21 | Landed in v0.17: transport-type filter chips, multi-select, persisted in `localStorage`. Client-side on purpose - the boards are always fetched with every product enabled, so all filter combinations share one proxy cache key instead of minting an upstream request per combination. |
+| F6 | 2026-09-21 | Landed in v0.18: the SPA shows which upstream served the screen, with the attribution link Transitous asks for. Tied to the `X-Data-Source` header the Worker sets, not guessed from geography. |
+| F7 | 2026-09-21 | Landed in v0.18: VBB HAFAS spoken directly from the Worker, replacing the community REST instance. This is the "self-hosted vbb-rest" item below, arrived at differently - mgate is plain JSON over HTTPS with a static auth blob, so it needs no Node APIs and no second deployment. |
+| F8 | 2026-09-21 | Landed in v0.18: Transitous/MOTIS as the second provider - coverage outside Berlin/Brandenburg, and the fallback when HAFAS fails. Open question deliberately left open: Transitous asks to be contacted before real traffic, and describes the service as for open-source non-commercial use. |
 
 ### Architecture upgrades
 
 The PoC and the future share one diagram -
 `client -> edge cache -> data source` - and each box upgrades in place:
 
-- Swap `UPSTREAM` for a self-hosted `vbb-rest` instance to drop the
-  shared-rate-limit dependency. Only that constant changes.
+- ~~Swap `UPSTREAM` for a self-hosted `vbb-rest` instance~~ - done in v0.18,
+  by speaking HAFAS from the Worker rather than hosting a second service.
+- Restore a live bearing. HAFAS's `JourneyGeoPos` rejects `getPasslist`, so
+  the radar gives a position without a heading; VBB's official API exposes
+  `journeyPosition`, which would bring it back on a supported footing.
 - Move the cache to KV or Redis so it survives restarts and spans isolates.
 - Wire Worker logs into observability - cache hit ratio and upstream 429s
   become signals you watch before they bite.
 - For anything public or commercial: move to the official VBB / GTFS data path
   and check the data-licence terms.
 
-## Data source
+## Data sources
 
-The community-run `v6.vbb.transport.rest` wraps an unofficial VBB endpoint -
-great for a hobby PoC, not official or guaranteed. Be a good neighbour: the
-proxy exists partly so this project does not hammer that shared instance.
-It also has real outages (three observed on 2026-09-01 alone). During one the
-Worker aborts the upstream call after 8s and serves stale cache when it has
-any; the app fails fast to an honest "data source is down" state when it does
-not.
+Two, both spoken to directly by the Worker and normalised to one API shape, so
+the SPA neither knows nor cares which answered.
+
+**VBB HAFAS** (`fahrinfo.vbb.de/bin/mgate.exe`) for Berlin + Brandenburg. Plain
+JSON over HTTPS with a static auth blob, which is why it runs inside the Worker
+with no Node APIs and no second deployment. It is an unofficial endpoint - fine
+for a hobby project, not guaranteed. For a supported footing, VBB issues API
+credentials on request at `api@vbb.de`.
+
+**Transitous / MOTIS** (`api.transitous.org`) for everywhere else, including
+Mecklenburg-Vorpommern, and as the fallback when HAFAS fails - the two share no
+infrastructure, so it is a second opinion rather than a retry. It is a publicly
+funded community service over DELFI's nationwide GTFS + GTFS-RT. Their usage
+policy asks for a User-Agent naming the app and a contact, and a visible link
+to their sources page; the Worker sends the first and the SPA renders the
+second whenever MOTIS served the screen. **Before any real traffic, email them**
+- they ask to be contacted ahead of heavy use, and they describe the service as
+for open-source non-commercial projects, which is worth confirming for a
+source-available CC BY-NC one.
+
+### Why not the community REST instance
+
+Until v0.17 the Worker proxied `v6.vbb.transport.rest`. That instance, not VBB's
+data, was the cause of every "data source is down" the app showed. Measured on
+2026-09-21 within the same minute: VBB's own HAFAS returned a Bornholmer Str.
+departure board in **176 ms** while `v6.vbb.transport.rest` timed out after
+12 s. A reporter on [vbb-rest#70](https://github.com/derhuerst/vbb-rest/issues/70)
+tracks the outages alternating by whole clock hours, and another found
+self-hosting fixed it. Talking to HAFAS directly is that fix, without the second
+deployment self-hosting would normally imply.
 
 ## License
 
@@ -271,9 +317,10 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.17`, DEVELOPMENT. The full loop works end to end against live
+Prototype, `v0.18`, DEVELOPMENT. The full loop works end to end against live
 data: departures → exit stop → verdict with route spine and shade meter →
 follow-the-ride, with live radar, the best-departure finder, the transport
 filter and opt-in encrypted history, in German and English, deployed at the
-URL above. Verified in one desktop browser. The v2A design handoff is fully
-implemented.
+URL above. Verified end to end in one desktop browser at Schönhauser
+Allee/Bornholmer Str. (Berlin), Cottbus (Brandenburg), Rostock and Greifswald
+(Mecklenburg-Vorpommern). The v2A design handoff is fully implemented.

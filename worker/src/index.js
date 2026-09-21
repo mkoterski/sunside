@@ -1,87 +1,147 @@
 /**
- * SunSide Berlin - edge proxy for the VBB transport API.
+ * SunSide Berlin - edge data layer for transit departures.
  *
- * Why this exists:
- *   The public VBB instance (v6.vbb.transport.rest) enforces a GLOBAL limit of
- *   100 req/min (burst 200), keyed by source IP. If every browser calls it
- *   directly, 10-100 concurrent users trivially exhaust that shared bucket and
- *   get 429'd. This Worker is the only thing that talks to VBB, so the limit
- *   becomes ours to manage centrally via three mechanisms:
+ * Two upstreams, one API
+ * ----------------------
+ * Until v0.17 this Worker proxied `https://v6.vbb.transport.rest`, a shared
+ * community instance. That instance was the single biggest source of
+ * user-facing breakage: measured on 2026-09-21, VBB's own HAFAS answered a
+ * Bornholmer Str. departure board in 176 ms while `v6.vbb.transport.rest`
+ * timed out after 12 s in the same minute. It was never VBB's data that was
+ * down - see derhuerst/vbb-rest#70, where one reporter tracks outages
+ * alternating by whole clock hours and another reports self-hosting fixed it.
  *
- *     1. Per-endpoint caching      - most transit data is far more cacheable
- *                                    than it feels (stop locations, trip geometry).
- *     2. Single-flight coalescing  - N simultaneous misses for the same key
- *                                    trigger ONE upstream fetch, fanned out to all.
- *     3. Egress token bucket       - hard ceiling below 100/min; sheds to stale
- *                                    cache instead of getting hard-429'd.
+ * So this Worker now talks to the data sources itself:
  *
- * Cost: runs entirely on Cloudflare's free Workers tier. No KV, no paid add-ons.
- * Caching is in-memory per isolate (Map) plus the Cache API; both are free.
+ *   HAFAS  - VBB's own mgate endpoint, for Berlin + Brandenburg. The protocol
+ *            is plain JSON over HTTPS with a static auth blob, so it needs no
+ *            Node APIs and runs inside the Worker. "Self-hosted" with no
+ *            second deployment: no container, no VPS, still the free tier.
  *
- * Future bigger picture (not built here): swap UPSTREAM for a self-hosted
- * vbb-rest instance to remove the shared-limit dependency entirely. Only the
- * UPSTREAM constant changes - the cache/single-flight logic carries forward.
+ *   MOTIS  - api.transitous.org, a publicly funded community service over
+ *            DELFI's nationwide GTFS + GTFS-RT. Covers what HAFAS does not:
+ *            Mecklenburg-Vorpommern and the rest of Germany. Also the fallback
+ *            when HAFAS fails, since the two share no infrastructure.
+ *
+ * Both are normalised to the same response shapes, so the SPA neither knows
+ * nor cares which answered. Stop and trip ids are namespaced (`h~` / `m~`) and
+ * round-trip through the client, which is what keeps follow-up calls on the
+ * provider that issued them.
+ *
+ * What the split costs: MOTIS exposes no live vehicle positions, so the radar
+ * strip is HAFAS-only. Outside Berlin/Brandenburg the app falls back to stop
+ * geometry for the bearing - which is what it already does for multi-leg rides.
+ *
+ * Cost: still entirely on Cloudflare's free tier. No KV, no paid add-ons.
+ * Caching is in-memory per isolate; single-flight and a token bucket keep us
+ * a polite neighbour to both upstreams.
  */
 
-const UPSTREAM = "https://v6.vbb.transport.rest";
-
-// Per-endpoint cache TTLs in seconds. Tuned to how fast each dataset actually
-// changes, not to a single conservative default.
+// ── Cache tuning ─────────────────────────────────────────────────────────────
+// Per-endpoint TTLs in seconds, tuned to how fast each dataset actually
+// changes rather than to one conservative default.
 const TTL = {
-  "locations/nearby": 6 * 60 * 60, // stop locations are static for hours
-  "stops":            25,          // departure boards: realtime-ish, short TTL
-  "trips":            120,         // trip stopover geometry: static for the trip
-  "radar":            8,           // live vehicle positions: the only truly live one
-  _default:           20,
+  nearby:     6 * 60 * 60, // stop locations are static for hours
+  departures: 25,          // realtime-ish, short TTL
+  trip:       120,         // stopover geometry: static for the trip
+  radar:      8,           // live vehicle positions: the only truly live one
 };
 
-// Egress budget. Public VBB allows 100/min; we stay under it with headroom so a
-// burst never trips the hard limit. Tokens refill continuously.
-const BUDGET = { capacity: 80, refillPerSec: 80 / 60 };
-
-// Hard ceiling on distinct cache entries. The cache key includes the raw query
-// string, so without this a flood of distinct queries (e.g. jittered radar
-// bounding boxes) could grow the Map until the isolate runs out of memory.
+// Hard ceiling on distinct cache entries. Keys include query parameters, so
+// without this a flood of distinct queries (jittered radar boxes, say) could
+// grow the Map until the isolate runs out of memory.
 const MAX_CACHE_ENTRIES = 500;
 
-// Which upstream paths we are willing to proxy. Anything else is rejected so the
-// Worker can't be turned into an open proxy.
-const ALLOW = [
-  /^locations\/nearby$/,
-  /^stops\/[^/]+\/departures$/,
-  /^stops\/[^/]+\/arrivals$/,
-  /^trips\/.+$/,
-  /^radar$/,
-  /^locations$/,
-];
+// Egress budget per upstream. Neither endpoint publishes a limit for us, but
+// both are somebody else's infrastructure and Transitous explicitly asks to be
+// contacted before heavy use - so we cap ourselves and shed to stale cache
+// rather than leaving it to them to say no.
+const BUDGET = { capacity: 80, refillPerSec: 80 / 60 };
 
-// ── In-isolate state (free; resets on cold start, which is fine) ──────────────
-const memCache = new Map();      // key -> { body, status, ct, expires }
-const inflight = new Map();      // key -> Promise (single-flight)
-let tokens = BUDGET.capacity;
-let lastRefill = Date.now();
+// ── VBB service area ─────────────────────────────────────────────────────────
+// Berlin + Brandenburg, generously bounded. Inside it HAFAS is preferred (it
+// has realtime throughout and live vehicle positions); outside it MOTIS is the
+// only one of the two with any data.
+const VBB_AREA = { south: 51.28, north: 53.62, west: 11.17, east: 14.83 };
+const inVbbArea = (lat, lon) =>
+  lat >= VBB_AREA.south && lat <= VBB_AREA.north &&
+  lon >= VBB_AREA.west && lon <= VBB_AREA.east;
 
-function refill() {
+// ── Provider: HAFAS (VBB, direct) ────────────────────────────────────────────
+const HAFAS_ENDPOINT = 'https://fahrinfo.vbb.de/bin/mgate.exe';
+
+// The envelope VBB's own web app sends. There is deliberately no `ext` field
+// and no `cfg` on the service request: including either makes mgate answer
+// `err: "PARSE"` and return nothing.
+const HAFAS_CLIENT = { type: 'WEB', id: 'VBB', name: 'VBB WebApp', l: 'vs_webapp_vbb' };
+const HAFAS_AUTH = { type: 'AID', aid: 'hafas-vbb-webapp' };
+const HAFAS_VER = '1.45';
+
+// HAFAS product bitmask, per hafas-client's VBB profile. A product's `cls` is
+// the same bitmask, which makes the mapping a simple lookup in both directions.
+const HAFAS_BITS = {
+  suburban: 1, subway: 2, tram: 4, bus: 8, ferry: 16, express: 32, regional: 64,
+};
+const HAFAS_ALL_PRODUCTS = 127;
+
+// ── Provider: MOTIS (Transitous) ─────────────────────────────────────────────
+const MOTIS_BASE = 'https://api.transitous.org';
+
+// Transitous requires a User-Agent naming the app, its version and a way to
+// reach a human; requests without one are answered 403. Their usage policy
+// also asks for a visible link to transitous.org/sources, which the SPA
+// renders whenever MOTIS served the data.
+const MOTIS_UA =
+  'sunside-berlin/0.18 (+https://github.com/mkoterski/sunside; matthias.koterski@nextwind.de)';
+
+// GTFS route types as MOTIS names them, mapped onto the product vocabulary the
+// SPA already uses for badge colours and the filter chips.
+const MOTIS_PRODUCTS = {
+  TRAM: 'tram',
+  SUBWAY: 'subway',
+  METRO: 'subway',
+  RAIL: 'regional',
+  REGIONAL_RAIL: 'regional',
+  REGIONAL_FAST_RAIL: 'regional',
+  NIGHT_RAIL: 'regional',
+  LONG_DISTANCE: 'express',
+  HIGHSPEED_RAIL: 'express',
+  COACH: 'bus',
+  BUS: 'bus',
+  FERRY: 'ferry',
+  SUBURBAN: 'suburban',
+  AIRPLANE: 'express',
+  OTHER: 'bus',
+};
+
+// ── In-isolate state (free; resets on cold start, which is fine) ─────────────
+const memCache = new Map(); // key -> { body, source, expires }
+const inflight = new Map(); // key -> Promise (single-flight)
+const buckets = {
+  hafas: { tokens: BUDGET.capacity, last: Date.now() },
+  motis: { tokens: BUDGET.capacity, last: Date.now() },
+};
+
+function refill(which) {
+  const b = buckets[which];
   const now = Date.now();
-  tokens = Math.min(BUDGET.capacity, tokens + ((now - lastRefill) / 1000) * BUDGET.refillPerSec);
-  lastRefill = now;
+  b.tokens = Math.min(BUDGET.capacity, b.tokens + ((now - b.last) / 1000) * BUDGET.refillPerSec);
+  b.last = now;
+  return b;
 }
-function takeToken() {
-  refill();
-  if (tokens >= 1) { tokens -= 1; return true; }
+function takeToken(which) {
+  const b = refill(which);
+  if (b.tokens >= 1) { b.tokens -= 1; return true; }
   return false;
 }
 
-// Insert into the cache while keeping it bounded. First drop anything already
-// expired (cheap, and usually enough), then evict oldest-inserted entries until
-// we are back under the ceiling. Map iteration order is insertion order, so the
-// first key is the oldest.
+// Insert while keeping the cache bounded: drop anything already expired first
+// (cheap, and usually enough), then evict oldest-inserted until under the
+// ceiling. Map iteration order is insertion order, so the first key is oldest.
 function setCache(key, entry) {
   if (memCache.size >= MAX_CACHE_ENTRIES) {
     const now = Date.now();
-    for (const [k, v] of memCache) {
-      if (v.expires <= now) memCache.delete(k);
-    }
+    for (const [k, v] of memCache) if (v.expires <= now) memCache.delete(k);
     while (memCache.size >= MAX_CACHE_ENTRIES) {
       const oldest = memCache.keys().next().value;
       if (oldest === undefined) break;
@@ -91,143 +151,615 @@ function setCache(key, entry) {
   memCache.set(key, entry);
 }
 
-function ttlForPath(path) {
-  if (path.startsWith("locations/nearby")) return TTL["locations/nearby"];
-  if (path.startsWith("stops/"))           return TTL["stops"];
-  if (path.startsWith("trips/"))           return TTL["trips"];
-  if (path.startsWith("radar"))            return TTL["radar"];
-  return TTL._default;
+// ── Time helpers ─────────────────────────────────────────────────────────────
+const pad = (n, w = 2) => String(n).padStart(w, '0');
+
+// Offset of Europe/Berlin at a given instant, in ms. Workers ship a full ICU,
+// so Intl resolves CET vs CEST for the right date without a timezone library.
+function berlinOffsetMs(instant) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Berlin', hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(instant);
+  const p = {};
+  for (const { type, value } of parts) p[type] = value;
+  const hour = p.hour === '24' ? 0 : Number(p.hour); // en-GB renders midnight as 24
+  const asUtc = Date.UTC(
+    Number(p.year), Number(p.month) - 1, Number(p.day),
+    hour, Number(p.minute), Number(p.second),
+  );
+  return asUtc - instant.getTime();
 }
 
-function pathAllowed(path) {
-  return ALLOW.some((re) => re.test(path));
+// Berlin wall-clock components -> the UTC instant they name. Two passes settle
+// the DST-boundary case, where the first guess picks the wrong side's offset.
+function berlinWallToInstant(y, mo, d, h, mi, s) {
+  const wallAsUtc = Date.UTC(y, mo - 1, d, h, mi, s);
+  let instant = wallAsUtc;
+  for (let i = 0; i < 2; i++) instant = wallAsUtc - berlinOffsetMs(new Date(instant));
+  return new Date(instant);
 }
 
-// Echo CORS headers only for our own origin. The SPA is served from the same
-// origin as this Worker, so same-origin requests work regardless; we deliberately
-// do NOT send a wildcard, which would turn the proxy into an open CORS proxy any
-// site could call from a browser.
-function withCors(resp, request) {
-  const origin = request.headers.get("Origin");
-  const h = new Headers(resp.headers);
-  if (origin && origin === new URL(request.url).origin) {
-    h.set("Access-Control-Allow-Origin", origin);
-    h.set("Vary", "Origin");
-    h.set("Access-Control-Allow-Methods", "GET,OPTIONS");
-    h.set("Access-Control-Allow-Headers", "Content-Type");
-  }
-  return new Response(resp.body, { status: resp.status, headers: h });
+// ISO 8601 carrying Berlin's offset, matching what the old upstream emitted
+// (2026-09-21T14:47:00+02:00) so the SPA's `new Date(...)` behaves identically.
+function isoBerlin(instant) {
+  const off = berlinOffsetMs(instant);
+  const local = new Date(instant.getTime() + off);
+  const sign = off >= 0 ? '+' : '-';
+  const abs = Math.abs(off) / 60000;
+  return `${local.getUTCFullYear()}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}` +
+    `T${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}:${pad(local.getUTCSeconds())}` +
+    `${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
 }
 
-function jsonResp(body, status, extraHeaders = {}) {
-  return new Response(body, {
-    status,
-    headers: { "Content-Type": "application/json", ...extraHeaders },
+// HAFAS dates are "YYYYMMDD"; times are "HHMMSS", optionally with a leading
+// day offset ("01164600" = 16:46:00 the following day) for boards running past
+// midnight. Returns an ISO string, or null when the field is absent.
+function hafasTime(dateStr, timeStr) {
+  if (!dateStr || timeStr == null) return null;
+  const t = String(timeStr);
+  const dayOffset = t.length > 6 ? Number(t.slice(0, t.length - 6)) : 0;
+  const hms = t.slice(-6);
+  return isoBerlin(berlinWallToInstant(
+    Number(dateStr.slice(0, 4)),
+    Number(dateStr.slice(4, 6)),
+    Number(dateStr.slice(6, 8)) + dayOffset,
+    Number(hms.slice(0, 2)), Number(hms.slice(2, 4)), Number(hms.slice(4, 6)),
+  ));
+}
+
+// "Now" as HAFAS wants it: Berlin wall clock, split into its date and time.
+function hafasNowParts() {
+  const now = new Date();
+  const berlin = new Date(now.getTime() + berlinOffsetMs(now));
+  return {
+    date: `${berlin.getUTCFullYear()}${pad(berlin.getUTCMonth() + 1)}${pad(berlin.getUTCDate())}`,
+    time: `${pad(berlin.getUTCHours())}${pad(berlin.getUTCMinutes())}${pad(berlin.getUTCSeconds())}`,
+  };
+}
+
+const secondsBetween = (a, b) => (a && b ? Math.round((Date.parse(a) - Date.parse(b)) / 1000) : null);
+
+// ── Geometry ─────────────────────────────────────────────────────────────────
+function haversineMetres(la1, lo1, la2, lo2) {
+  const R = 6371000, r = Math.PI / 180;
+  const dLa = (la2 - la1) * r, dLo = (lo2 - lo1) * r;
+  const a = Math.sin(dLa / 2) ** 2 + Math.cos(la1 * r) * Math.cos(la2 * r) * Math.sin(dLo / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ── HAFAS ────────────────────────────────────────────────────────────────────
+async function mgate(meth, req, signal) {
+  const res = await fetch(HAFAS_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({
+      lang: 'de',
+      svcReqL: [{ meth, req }],
+      client: HAFAS_CLIENT,
+      ver: HAFAS_VER,
+      auth: HAFAS_AUTH,
+    }),
+    signal,
   });
+  if (!res.ok) throw new Error(`hafas http ${res.status}`);
+  const body = await res.json();
+  if (body.err && body.err !== 'OK') throw new Error(`hafas ${body.err}`);
+  const svc = body.svcResL && body.svcResL[0];
+  if (!svc) throw new Error('hafas: empty response');
+  if (svc.err && svc.err !== 'OK') throw new Error(`hafas ${svc.err}`);
+  return svc.res || {};
 }
 
-/**
- * Fetch a VBB path through cache + single-flight + budget.
- * `path` is the upstream path WITHOUT leading slash, query string included.
- */
-async function getUpstream(path, search) {
-  const key = path + (search || "");
+function productFromCls(cls) {
+  for (const name in HAFAS_BITS) if (HAFAS_BITS[name] === cls) return name;
+  return 'regional';
+}
+
+// VBB's own profile strips the redundant mode prefix from line names and gives
+// the two Ringbahn directions distinguishable names. Both are reproduced here
+// so labels read the way riders - and the SPA's badges - expect.
+const hafasLineName = (raw) => String(raw || '?').replace(/^(bus|tram)\s+/i, '').trim();
+
+function renameRingbahn(product, direction) {
+  if (product !== 'suburban' || !direction) return direction;
+  const d = direction.trim();
+  if (/^ringbahn s\s?41$/i.test(d)) return 'Ringbahn S41 ⟳';
+  if (/^ringbahn s\s?42$/i.test(d)) return 'Ringbahn S42 ⟲';
+  return direction;
+}
+
+async function hafasNearby({ lat, lon, distance, results }, signal) {
+  const res = await mgate('LocGeoPos', {
+    ring: {
+      cCrd: { x: Math.round(lon * 1e6), y: Math.round(lat * 1e6) },
+      maxDist: distance, minDist: 0,
+    },
+    getStops: true, getPOIs: false, maxLoc: results,
+  }, signal);
+
+  return (res.locL || []).filter((l) => l.crd).map((l) => ({
+    type: 'stop',
+    id: `h~${l.extId}`,
+    name: l.name,
+    location: { type: 'location', latitude: l.crd.y / 1e6, longitude: l.crd.x / 1e6 },
+    distance: l.dist != null ? Math.round(l.dist) : null,
+  }));
+}
+
+async function hafasDepartures({ id, duration, results, products }, signal) {
+  const { date, time } = hafasNowParts();
+  const res = await mgate('StationBoard', {
+    type: 'DEP', date, time,
+    stbLoc: { type: 'S', lid: `A=1@L=${id}@` },
+    jnyFltrL: [{ type: 'PROD', mode: 'INC', value: String(products) }],
+    dur: duration,
+    maxJny: results,
+  }, signal);
+
+  const prodL = res.common?.prodL || [];
+  const departures = (res.jnyL || []).map((j) => {
+    const stb = j.stbStop || {};
+    const prod = prodL[stb.dProdX != null ? stb.dProdX : j.prodX] || {};
+    const product = productFromCls(prod.cls);
+    const plannedWhen = hafasTime(j.date, stb.dTimeS);
+    const when = hafasTime(j.date, stb.dTimeR) || plannedWhen;
+    // A realtime prognosis is what makes the SPA's LIVE badge honest: without
+    // one, delay stays null rather than being reported as an on-time zero.
+    const hasPrognosis = stb.dTimeR != null;
+    return {
+      tripId: `h~${j.jid}`,
+      direction: renameRingbahn(product, j.dirTxt),
+      when,
+      plannedWhen,
+      delay: hasPrognosis ? secondsBetween(when, plannedWhen) : null,
+      line: { type: 'line', name: hafasLineName(prod.name), product },
+    };
+  }).filter((d) => d.when);
+
+  return { departures };
+}
+
+async function hafasTrip({ id }, signal) {
+  const res = await mgate('JourneyDetails', { jid: id, getPasslist: true, getPolyline: false }, signal);
+  const locL = res.common?.locL || [];
+  const date = res.journey?.date;
+  const stopovers = (res.journey?.stopL || []).map((s) => {
+    const l = locL[s.locX] || {};
+    return {
+      stop: {
+        type: 'stop',
+        id: l.extId ? `h~${l.extId}` : null,
+        name: l.name,
+        location: l.crd
+          ? { type: 'location', latitude: l.crd.y / 1e6, longitude: l.crd.x / 1e6 }
+          : null,
+      },
+      arrival: hafasTime(date, s.aTimeR) || hafasTime(date, s.aTimeS),
+      plannedArrival: hafasTime(date, s.aTimeS),
+      departure: hafasTime(date, s.dTimeR) || hafasTime(date, s.dTimeS),
+      plannedDeparture: hafasTime(date, s.dTimeS),
+    };
+  });
+  return { trip: { id: `h~${id}`, stopovers } };
+}
+
+async function hafasRadar({ north, south, east, west, results, products }, signal) {
+  const { date, time } = hafasNowParts();
+  const res = await mgate('JourneyGeoPos', {
+    maxJny: results, onlyRT: false, date, time,
+    rect: {
+      llCrd: { x: Math.round(west * 1e6), y: Math.round(south * 1e6) },
+      urCrd: { x: Math.round(east * 1e6), y: Math.round(north * 1e6) },
+    },
+    perSize: 30000, perStep: 30000, ageOfReport: true,
+    jnyFltrL: [{ type: 'PROD', mode: 'INC', value: String(products) }],
+    trainPosMode: 'CALC',
+  }, signal);
+
+  const prodL = res.common?.prodL || [];
+  // No `bearing`: JourneyGeoPos rejects getPasslist, so there is no next stop
+  // to take a heading towards. The SPA treats a missing bearing as a cue to
+  // fall back to stop geometry, which is the better source on anything but a
+  // dead-straight single leg anyway.
+  const movements = (res.jnyL || []).filter((j) => j.pos).map((j) => {
+    const prod = prodL[j.prodX] || {};
+    const product = productFromCls(prod.cls);
+    return {
+      tripId: `h~${j.jid}`,
+      direction: renameRingbahn(product, j.dirTxt),
+      line: { type: 'line', name: hafasLineName(prod.name), product },
+      location: { type: 'location', latitude: j.pos.y / 1e6, longitude: j.pos.x / 1e6 },
+    };
+  });
+  return { movements };
+}
+
+// ── MOTIS ────────────────────────────────────────────────────────────────────
+async function motisGet(path, params, signal) {
+  const url = new URL(MOTIS_BASE + path);
+  for (const k in params) if (params[k] != null) url.searchParams.set(k, params[k]);
+  const res = await fetch(url, {
+    headers: { 'Accept': 'application/json', 'User-Agent': MOTIS_UA },
+    signal,
+  });
+  if (!res.ok) throw new Error(`motis http ${res.status}`);
+  const body = await res.json();
+  if (body && body.error) throw new Error(`motis: ${body.error}`);
+  return body;
+}
+
+const motisProduct = (mode) => MOTIS_PRODUCTS[mode] || 'bus';
+
+// MOTIS ids are "<feed>_<DHID>", and a DHID is country:area:stop[:quay[:edge]].
+// Trimming to three components names the station a platform belongs to, which
+// is what lets several platform rows collapse into one place a rider would
+// recognise. Six "Rostock Hauptbahnhof" rows in the nearby list, each eating
+// one of the SPA's four stop slots, is what happens without it.
+//
+// GROUPING ONLY. The parent is not necessarily a stop MOTIS can answer for:
+// Rostock Hbf has one, Greifswald Landratsamt does not and returns 404. So we
+// group by the parent and hand back the id MOTIS actually gave us. That is
+// safe as well as correct, because querying a platform id returns the whole
+// station's board anyway, both directions included.
+function motisParent(stopId) {
+  const s = String(stopId);
+  const us = s.indexOf('_');
+  if (us < 0) return s;
+  const parts = s.slice(us + 1).split(':');
+  return parts.length > 3 ? `${s.slice(0, us)}_${parts.slice(0, 3).join(':')}` : s;
+}
+
+// DELFI aggregates several source feeds, so one station can appear under
+// several ids that no amount of id arithmetic will reconcile (de-VBB_… and
+// de-DELFI_… for the same Rostock platform). Names are what a rider compares,
+// so names are what we collapse on.
+const normaliseStopName = (name) => String(name || '')
+  .toLowerCase()
+  .normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim();
+
+async function motisNearby({ lat, lon, distance, results }, signal) {
+  // map/stops takes a box, not a radius; derive one that comfortably contains
+  // the requested circle, then filter by true distance below.
+  const dLat = distance / 111320;
+  const dLon = distance / (111320 * Math.max(0.2, Math.cos(lat * Math.PI / 180)));
+  const raw = await motisGet('/api/v6/map/stops', {
+    min: `${lat - dLat},${lon - dLon}`,
+    max: `${lat + dLat},${lon + dLon}`,
+  }, signal);
+
+  // Collapse platforms to their parent, then collapse feed duplicates by name.
+  // Keeping the nearest of each group is what makes the walking distance the
+  // SPA prints mean "to the closest way in", not "to an arbitrary platform".
+  const byName = new Map();
+  for (const s of raw || []) {
+    if (s.lat == null || s.lon == null) continue;
+    const d = haversineMetres(lat, lon, s.lat, s.lon);
+    if (d > distance) continue;
+    const key = normaliseStopName(s.name);
+    if (!key) continue;
+    const prev = byName.get(key);
+    if (!prev || d < prev.distance) {
+      byName.set(key, {
+        type: 'stop',
+        id: `m~${s.stopId}`,        // as given: see the note on motisParent
+        parent: motisParent(s.stopId),
+        name: s.name,
+        location: { type: 'location', latitude: s.lat, longitude: s.lon },
+        distance: Math.round(d),
+      });
+    }
+  }
+  // A second pass by parent station: two differently-named entries can still
+  // belong to one station ("Rostock, Hauptbahnhof Süd" and "Rostock ZOB" do).
+  // Left in, they are two rows the SPA fans out to that fetch the same board.
+  const byStation = new Map();
+  for (const st of [...byName.values()].sort((a, b) => a.distance - b.distance)) {
+    if (!byStation.has(st.parent)) byStation.set(st.parent, st);
+  }
+  return [...byStation.values()].slice(0, results).map(({ parent, ...s }) => s);
+}
+
+async function motisDepartures({ id, duration, results, productSet }, signal) {
+  // stoptimes counts rows, it does not take a time window, so ask for a
+  // generous page and cut it to the window ourselves.
+  const body = await motisGet('/api/v6/stoptimes', {
+    stopId: id,
+    n: Math.max(results * 2, 20),
+    arriveBy: 'false',
+  }, signal);
+
+  const cutoff = Date.now() + duration * 60000;
+  const departures = [];
+  for (const st of body.stopTimes || []) {
+    const product = motisProduct(st.mode);
+    if (productSet && !productSet.has(product)) continue;
+    const place = st.place || {};
+    const when = place.departure || place.scheduledDeparture;
+    if (!when || Date.parse(when) > cutoff) continue;
+    departures.push({
+      tripId: `m~${st.tripId}`,
+      direction: st.headsign || null,
+      when,
+      plannedWhen: place.scheduledDeparture || when,
+      // MOTIS flags whether a row is realtime-backed; only then is a delay a
+      // measurement rather than a number subtracted from itself.
+      delay: st.realTime ? secondsBetween(when, place.scheduledDeparture) : null,
+      line: { type: 'line', name: st.routeShortName || st.displayName || '?', product },
+    });
+    if (departures.length >= results) break;
+  }
+  return { departures };
+}
+
+async function motisTrip({ id }, signal) {
+  const body = await motisGet('/api/v6/trip', { tripId: id }, signal);
+  const stopovers = [];
+  for (const leg of body.legs || []) {
+    for (const p of [leg.from, ...(leg.intermediateStops || []), leg.to]) {
+      if (!p) continue;
+      // Consecutive legs share their boundary stop; skip the repeat so the
+      // geometry walk never sees a zero-length segment.
+      const last = stopovers[stopovers.length - 1];
+      if (last && last.stop.name === p.name) continue;
+      stopovers.push({
+        stop: {
+          type: 'stop',
+          id: p.stopId ? `m~${p.stopId}` : null,
+          name: p.name,
+          location: p.lat != null
+            ? { type: 'location', latitude: p.lat, longitude: p.lon }
+            : null,
+        },
+        arrival: p.arrival || p.scheduledArrival || null,
+        plannedArrival: p.scheduledArrival || null,
+        departure: p.departure || p.scheduledDeparture || null,
+        plannedDeparture: p.scheduledDeparture || null,
+      });
+    }
+  }
+  return { trip: { id: `m~${id}`, stopovers } };
+}
+
+// MOTIS exposes no live vehicle positions, so an empty list is the honest
+// answer - better than a position interpolated along a polyline and presented
+// as a GPS fix.
+async function motisRadar() {
+  return { movements: [] };
+}
+
+const PROVIDERS = {
+  hafas: { nearby: hafasNearby, departures: hafasDepartures, trip: hafasTrip, radar: hafasRadar },
+  motis: { nearby: motisNearby, departures: motisDepartures, trip: motisTrip, radar: motisRadar },
+};
+
+// ── Request parsing ──────────────────────────────────────────────────────────
+// The SPA sends VBB-style product flags ("tram=true&bus=false&…"). Translate
+// once, into both the HAFAS bitmask and a set for MOTIS filtering.
+function parseProducts(sp) {
+  let mask = 0;
+  const set = new Set();
+  let sawAny = false;
+  for (const name in HAFAS_BITS) {
+    const v = sp.get(name);
+    if (v === null) continue;
+    sawAny = true;
+    if (v === 'true') { mask |= HAFAS_BITS[name]; set.add(name); }
+  }
+  if (!sawAny || mask === 0) return { mask: HAFAS_ALL_PRODUCTS, set: null };
+  return { mask, set };
+}
+
+function num(sp, key, dflt) {
+  const v = Number(sp.get(key));
+  return Number.isFinite(v) ? v : dflt;
+}
+
+// Split a namespaced id back into its provider and that provider's own id. An
+// id with no prefix is treated as HAFAS, which keeps anything bookmarked
+// before v0.18 working.
+function splitId(raw) {
+  const s = decodeURIComponent(raw || '');
+  if (s.startsWith('h~')) return { provider: 'hafas', id: s.slice(2) };
+  if (s.startsWith('m~')) return { provider: 'motis', id: s.slice(2) };
+  return { provider: 'hafas', id: s };
+}
+
+// ── Fetch with cache + single-flight + budget ────────────────────────────────
+async function served(key, ttl, provider, run) {
   const now = Date.now();
 
-  // 1. Fresh cache hit.
   const cached = memCache.get(key);
   if (cached && cached.expires > now) {
-    return jsonResp(cached.body, cached.status, { "X-Cache": "HIT" });
+    return { body: cached.body, source: cached.source, cache: 'HIT' };
   }
-
-  // 2. Coalesce concurrent misses onto one in-flight request.
   if (inflight.has(key)) {
     const r = await inflight.get(key);
-    return jsonResp(r.body, r.status, { "X-Cache": "COALESCED" });
+    return { body: r.body, source: r.source, cache: 'COALESCED' };
+  }
+  if (!takeToken(provider)) {
+    if (cached) return { body: cached.body, source: cached.source, cache: 'STALE-BUDGET' };
+    const e = new Error('rate budget exhausted, retry shortly');
+    e.status = 503;
+    throw e;
   }
 
-  // 3. Budget check. If exhausted, serve stale cache if we have any.
-  if (!takeToken()) {
-    if (cached) {
-      return jsonResp(cached.body, cached.status, { "X-Cache": "STALE-BUDGET" });
-    }
-    return jsonResp(JSON.stringify({ error: "rate budget exhausted, retry shortly" }), 503,
-      { "Retry-After": "2" });
-  }
-
-  const ttl = ttlForPath(path);
   const promise = (async () => {
-    const upstreamUrl = `${UPSTREAM}/${path}${search || ""}`;
-    // Hard timeout: when VBB is down its connections hang rather than refuse,
-    // which without this held every client on a loading screen indefinitely.
-    // Failing fast lets the catch below serve stale cache or an honest 502.
-    const res = await fetch(upstreamUrl, {
-      headers: { "Accept": "application/json", "User-Agent": "sunside-berlin-poc" },
-      signal: AbortSignal.timeout(8000),
-    });
-    const body = await res.text();
-    const entry = { body, status: res.status, expires: Date.now() + ttl * 1000 };
-    // Only cache successful responses; let errors retry next time.
-    if (res.ok) setCache(key, entry);
+    // Fail fast. A stalled upstream is the failure mode that historically left
+    // the app on a loading screen forever, so it gets a deadline, not patience.
+    const body = await run(AbortSignal.timeout(8000));
+    const entry = { body, source: provider, expires: Date.now() + ttl * 1000 };
+    setCache(key, entry);
     return entry;
   })();
 
   inflight.set(key, promise);
   try {
     const r = await promise;
-    return jsonResp(r.body, r.status, { "X-Cache": "MISS" });
+    return { body: r.body, source: r.source, cache: 'MISS' };
   } catch (e) {
-    // On upstream failure fall back to stale cache if present.
-    if (cached) return jsonResp(cached.body, cached.status, { "X-Cache": "STALE-ERROR" });
-    return jsonResp(JSON.stringify({ error: "upstream fetch failed" }), 502);
+    // Serve stale rather than nothing: a board a minute old beats an error
+    // screen, and the SPA shows departure times so staleness is visible.
+    if (cached) return { body: cached.body, source: cached.source, cache: 'STALE-ERROR' };
+    throw e;
   } finally {
     inflight.delete(key);
   }
 }
 
-export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-    const isApi = url.pathname.startsWith("/api/");
-    const isHealth = url.pathname === "/healthz";
+// ── Response helpers ─────────────────────────────────────────────────────────
+function jsonResp(obj, status, extra = {}) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...extra },
+  });
+}
 
-    if (request.method === "OPTIONS") {
+// Origins allowed to call this Worker cross-origin. The SPA is same-origin so
+// it never needs an entry; the GitHub Pages testing copy does, because since
+// v0.18 there is no public REST upstream it could call directly instead. This
+// stays an explicit list rather than a wildcard, which would make the Worker
+// an open proxy for VBB that any site could spend our budget on.
+const EXTRA_ORIGINS = new Set(['https://mkoterski.github.io']);
+
+function withCors(resp, request) {
+  const origin = request.headers.get('Origin');
+  const h = new Headers(resp.headers);
+  if (origin && (origin === new URL(request.url).origin || EXTRA_ORIGINS.has(origin))) {
+    h.set('Access-Control-Allow-Origin', origin);
+    h.set('Vary', 'Origin');
+    h.set('Access-Control-Allow-Methods', 'GET,OPTIONS');
+    h.set('Access-Control-Allow-Headers', 'Content-Type');
+  }
+  h.set('Access-Control-Expose-Headers', 'X-Data-Source, X-Cache');
+  return new Response(resp.body, { status: resp.status, headers: h });
+}
+
+// ── Routing ──────────────────────────────────────────────────────────────────
+async function handleApi(url) {
+  const path = url.pathname.slice('/api/'.length).replace(/^\/+/, '');
+  const sp = url.searchParams;
+  const products = parseProducts(sp);
+
+  // Nearby stops. This is the only call that picks a provider from geography;
+  // every later call follows the id the SPA received from here.
+  if (path === 'locations/nearby') {
+    const lat = num(sp, 'latitude', NaN);
+    const lon = num(sp, 'longitude', NaN);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return jsonResp({ error: 'latitude and longitude are required' }, 400);
+    }
+    const distance = Math.min(num(sp, 'distance', 700), 2000);
+    const results = Math.min(num(sp, 'results', 10), 25);
+    const args = { lat, lon, distance, results };
+    const primary = inVbbArea(lat, lon) ? 'hafas' : 'motis';
+    const keyOf = (p) => `nearby|${p}|${lat.toFixed(3)}|${lon.toFixed(3)}|${distance}|${results}`;
+
+    try {
+      const r = await served(keyOf(primary), TTL.nearby, primary, (s) => PROVIDERS[primary].nearby(args, s));
+      if (r.body.length) {
+        return jsonResp(r.body, 200, { 'X-Cache': r.cache, 'X-Data-Source': r.source });
+      }
+    } catch (e) {
+      if (e.status === 503) throw e;
+    }
+    // Either HAFAS failed or it knows nothing here. MOTIS shares no
+    // infrastructure with it, so this is a second opinion rather than a retry -
+    // and outside Berlin/Brandenburg it is the only one with data at all.
+    if (primary === 'hafas') {
+      const r = await served(keyOf('motis'), TTL.nearby, 'motis', (s) => motisNearby(args, s));
+      return jsonResp(r.body, 200, { 'X-Cache': r.cache, 'X-Data-Source': r.source });
+    }
+    return jsonResp([], 200, { 'X-Data-Source': primary });
+  }
+
+  const depMatch = path.match(/^stops\/(.+)\/departures$/);
+  if (depMatch) {
+    const { provider, id } = splitId(depMatch[1]);
+    const duration = Math.min(num(sp, 'duration', 35), 180);
+    const results = Math.min(num(sp, 'results', 12), 60);
+    const args = { id, duration, results, products: products.mask, productSet: products.set };
+    const key = `dep|${provider}|${id}|${duration}|${results}|${products.mask}`;
+    const r = await served(key, TTL.departures, provider, (s) => PROVIDERS[provider].departures(args, s));
+    return jsonResp(r.body, 200, { 'X-Cache': r.cache, 'X-Data-Source': r.source });
+  }
+
+  const tripMatch = path.match(/^trips\/(.+)$/);
+  if (tripMatch) {
+    const { provider, id } = splitId(tripMatch[1]);
+    const key = `trip|${provider}|${id}`;
+    const r = await served(key, TTL.trip, provider, (s) => PROVIDERS[provider].trip({ id }, s));
+    return jsonResp(r.body, 200, { 'X-Cache': r.cache, 'X-Data-Source': r.source });
+  }
+
+  if (path === 'radar') {
+    const north = num(sp, 'north', NaN), south = num(sp, 'south', NaN);
+    const east = num(sp, 'east', NaN), west = num(sp, 'west', NaN);
+    if (![north, south, east, west].every(Number.isFinite)) {
+      return jsonResp({ error: 'north, south, east and west are required' }, 400);
+    }
+    // Radar is HAFAS-only; outside its area the empty list is the true answer.
+    if (!inVbbArea((north + south) / 2, (east + west) / 2)) {
+      return jsonResp({ movements: [] }, 200, { 'X-Data-Source': 'motis' });
+    }
+    const results = Math.min(num(sp, 'results', 64), 128);
+    const args = { north, south, east, west, results, products: products.mask };
+    const key = `radar|${north.toFixed(3)}|${south.toFixed(3)}|${east.toFixed(3)}|${west.toFixed(3)}|${results}`;
+    try {
+      const r = await served(key, TTL.radar, 'hafas', (s) => hafasRadar(args, s));
+      return jsonResp(r.body, 200, { 'X-Cache': r.cache, 'X-Data-Source': r.source });
+    } catch (e) {
+      if (e.status === 503) throw e;
+      // The vehicle strip is a nicety; losing it must not fail the screen.
+      return jsonResp({ movements: [] }, 200, { 'X-Data-Source': 'none' });
+    }
+  }
+
+  return jsonResp({ error: 'path not allowed' }, 403);
+}
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const isApi = url.pathname.startsWith('/api/');
+    const isHealth = url.pathname === '/healthz';
+
+    if (request.method === 'OPTIONS') {
       return withCors(new Response(null, { status: 204 }), request);
     }
 
-    // This is a read-only proxy; only GET is meaningful. Reject everything else
-    // before it can reach the upstream or the metrics endpoint.
-    if ((isApi || isHealth) && request.method !== "GET") {
-      return withCors(
-        jsonResp(JSON.stringify({ error: "method not allowed" }), 405, { "Allow": "GET, OPTIONS" }),
-        request,
-      );
+    // Read-only service; only GET is meaningful.
+    if ((isApi || isHealth) && request.method !== 'GET') {
+      return withCors(jsonResp({ error: 'method not allowed' }, 405, { 'Allow': 'GET, OPTIONS' }), request);
     }
 
-    // Health/metrics endpoint - handy during the demo.
     if (isHealth) {
-      refill();
-      return withCors(jsonResp(JSON.stringify({
+      const tokensRemaining = {};
+      for (const name in buckets) tokensRemaining[name] = Math.floor(refill(name).tokens);
+      return withCors(jsonResp({
         ok: true,
-        tokensRemaining: Math.floor(tokens),
+        version: '0.18',
+        upstreams: { hafas: HAFAS_ENDPOINT, motis: MOTIS_BASE },
+        tokensRemaining,
         cacheEntries: memCache.size,
         inflight: inflight.size,
-      }), 200), request);
+      }, 200), request);
     }
 
-    // API proxy: everything under /api/* maps to the VBB path.
     if (isApi) {
-      const path = url.pathname.slice("/api/".length).replace(/^\/+/, "");
-      if (!pathAllowed(path)) {
-        return withCors(jsonResp(JSON.stringify({ error: "path not allowed" }), 403), request);
+      try {
+        return withCors(await handleApi(url), request);
+      } catch (e) {
+        const status = e.status || 502;
+        const extra = status === 503 ? { 'Retry-After': '2' } : {};
+        return withCors(jsonResp({ error: e.message || 'upstream fetch failed' }, status, extra), request);
       }
-      return withCors(await getUpstream(path, url.search), request);
     }
 
-    // Static assets (the SPA). Served from the bound ASSETS binding.
-    if (env.ASSETS) {
-      return env.ASSETS.fetch(request);
-    }
-    return new Response("Not found", { status: 404 });
+    if (env.ASSETS) return env.ASSETS.fetch(request);
+    return new Response('Not found', { status: 404 });
   },
 };
