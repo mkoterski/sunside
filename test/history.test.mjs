@@ -31,6 +31,15 @@ function eq(actual, expected, msg) {
 const storage = makeStorage();
 const h = makeHistory({ storage, cryptoObj: crypto });
 
+// The needle for the no-plaintext check below, and therefore deliberately
+// distinctive rather than realistic. The check used to look for the line name
+// "U9", which is two characters from base64's own 64-character alphabet: in a
+// few hundred characters of ciphertext that pair turns up by chance about once
+// in ten runs, so a correctly encrypted store failed the suite at random - and
+// because `npm test` chains the suites with &&, took the provider tests down
+// with it. A long needle cannot be produced by luck.
+const LINE = 'U9-plaintext-canary';
+
 // ── init + basic state ──────────────────────────────────────────────────────
 eq(h.exists(), false, 'no store before first unlock');
 eq(h.isUnlocked(), false, 'locked before first unlock');
@@ -42,7 +51,7 @@ eq((await h.getTrips()).length, 0, 'fresh store has no trips');
 eq((await h.getStops()).length, 0, 'fresh store has no stops');
 
 // ── round-trip across sessions ──────────────────────────────────────────────
-await h.addTrip({ line: 'U9', dir: 'Osloer Str.', from: 'U Amrumer Str.', to: 'U Turmstr.' });
+await h.addTrip({ line: LINE, dir: 'Osloer Str.', from: 'U Amrumer Str.', to: 'U Turmstr.' });
 await h.addStop({ name: 'U Amrumer Str.', lat: 52.542, lon: 13.349 });
 h.lock();
 eq(h.isUnlocked(), false, 'lock drops the key');
@@ -55,12 +64,31 @@ eq(await h.unlock('korrekt-pferd-batterie'), true, 'correct passphrase unlocks a
 eq((await h.getTrips())[0].to, 'U Turmstr.', 'trip survives lock/unlock round-trip');
 
 // ── no plaintext at rest ─────────────────────────────────────────────────────
-const raw = storage._dump();
-eq(raw.includes('Turmstr'), false, 'stop name is not in storage plaintext');
-eq(raw.includes('U9'), false, 'line name is not in storage plaintext');
+// Everything a snooper with the device could read: the serialised store as it
+// sits in localStorage, plus every base64 field decoded back to bytes. The
+// decode matters because base64 expands a 3-byte window into 4 characters from
+// a 64-symbol alphabet, which makes short strings far likelier to appear there
+// by chance than in the bytes they encode.
+function atRest() {
+  const raw = storage._dump();
+  const decoded = [...raw.matchAll(/[A-Za-z0-9+/]{16,}={0,2}/g)]
+    .map((m) => Buffer.from(m[0], 'base64').toString('latin1'))
+    .join('\n');
+  return `${raw}\n${decoded}`;
+}
+
+eq(atRest().includes('Turmstr'), false, 'stop name is not in storage plaintext');
+eq(atRest().includes(LINE), false, 'line name is not in storage plaintext');
+
+// A check that cannot fail proves nothing, so make it fail on purpose: a
+// plaintext field written beside the encrypted blob has to be caught.
+storage.setItem('sunside.leak-probe', JSON.stringify({ line: LINE }));
+eq(atRest().includes(LINE), true, 'the check does catch a field written in the clear');
+storage.removeItem('sunside.leak-probe');
+eq(atRest().includes(LINE), false, 'and the store is clean again once it is gone');
 
 // ── dedup + cap ──────────────────────────────────────────────────────────────
-await h.addTrip({ line: 'U9', dir: 'Osloer Str.', from: 'U Amrumer Str.', to: 'U Turmstr.' });
+await h.addTrip({ line: LINE, dir: 'Osloer Str.', from: 'U Amrumer Str.', to: 'U Turmstr.' });
 eq((await h.getTrips()).length, 1, 'same trip dedups by line+from+to');
 for (let i = 0; i < 15; i++) await h.addTrip({ line: 'M13', from: 'A', to: `Stop ${i}` });
 eq((await h.getTrips()).length, 12, 'trips capped at 12');
