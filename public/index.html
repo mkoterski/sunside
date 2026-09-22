@@ -180,16 +180,30 @@ header{
    data is used, and VBB's API terms ask that their data be named as the
    source. The line says whichever is true of the screen in front of you, and
    stays hidden when the answer came from the mgate endpoint. */
-.attrib{display:none;padding:var(--sp3) var(--sp5) var(--sp5);
+.attrib{display:none;padding:var(--sp3) var(--sp5) 0;
   font-size:var(--xs);color:var(--faint);text-align:center;line-height:1.5}
 .attrib.on{display:block}
 .attrib a{color:var(--muted);text-decoration:underline;text-underline-offset:2px}
 .attrib a:hover{color:var(--accent)}
 
+/* ── Footer: build version ── */
+/* Always on, unlike the attribution line above it. A tester reporting "the
+   board looked wrong" is only useful with a build number attached, and one
+   that lives in the console banner alone is one nobody reads on a phone. */
+.appver{padding:var(--sp2) var(--sp5) var(--sp5);text-align:center;
+  font-size:var(--xs);color:var(--faint)}
+.appver a{color:var(--faint);text-decoration:none}
+.appver a:hover,.appver a:focus-visible{color:var(--accent);
+  text-decoration:underline;text-underline-offset:2px}
+
 /* ── Product filter chips (F5) ── */
-.filter-row{display:flex;gap:var(--sp2);overflow-x:auto;padding:2px 0 var(--sp2);
-  margin-bottom:var(--sp1);scrollbar-width:none;-ms-overflow-style:none}
-.filter-row::-webkit-scrollbar{display:none}
+/* The row wraps; it does not scroll sideways. It used to, with the scrollbar
+   hidden for looks, and on a 390 px phone that put Bus and Regional past the
+   right edge with nothing on screen saying they were there - an option you
+   cannot see is an option you do not have. Six chips wrap to two rows and all
+   of them are reachable without a gesture nobody knew to make. */
+.filter-row{display:flex;flex-wrap:wrap;gap:var(--sp2);padding:2px 0 var(--sp2);
+  margin-bottom:var(--sp1)}
 .chip{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;min-height:34px;
   padding:var(--sp1) var(--sp3);border-radius:var(--r-full);
   background:var(--offset);color:var(--muted);border:1px solid transparent;
@@ -516,6 +530,8 @@ button:focus-visible,.dep-card:focus-visible,.stop-item:focus-visible{outline:2p
 
 <!-- Names the upstream that served this screen, when it asks to be named (F6). -->
 <div class="attrib" id="attrib"></div>
+<!-- The build, linking to the project page. Filled in from APP_VERSION. -->
+<div class="appver" id="appver"></div>
 </div>
 
 <script src="history.js"></script>
@@ -821,7 +837,18 @@ function histSaveTrip(dep,fromStop,toStop){
 const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
   ||(typeof location!=='undefined'&&location.hostname.endsWith('github.io')
       ?'https://sunside-berlin.mkoterski.workers.dev/api':'/api');
-console.log('SunSide Berlin v0.19 - API base:',API);
+// One constant for both places the build shows itself: the console banner and
+// the footer. Two hand-edited strings drift, and a footer that lies about the
+// build is worse than no footer.
+const APP_VERSION='0.20';
+console.log(`SunSide Berlin v${APP_VERSION} - API base:`,API);
+
+// Project page rather than the repository: it is the page that explains what
+// this is, and it is where the prototypes live.
+(function(){
+  const el=document.getElementById('appver');
+  if(el)el.innerHTML=`<a href="https://mkoterski.github.io/sunside/" target="_blank" rel="noopener">SunSide Berlin v${APP_VERSION}</a>`;
+})();
 
 // Which upstream served the current board: 'vbb' (the official VBB ReST API),
 // 'hafas' (VBB's mgate endpoint) or 'motis' (Transitous). Drives the

@@ -1,4 +1,4 @@
-# SunSide Berlin - v0.19
+# SunSide Berlin - v0.20
 
 **Status:** DEVELOPMENT
 **Versioning:** `v0.x` = development/testing, `v1.x` = production-ready
@@ -139,6 +139,7 @@ Worker - but two things still work:
 | Regional rail | Included since v0.18 - outside Berlin it is often the only service on a route, and a 40-minute regional ride is where the sun side matters most |
 | Best-departure finder | Ranks the next departures of the same line by sun exposure - and says honestly when they barely differ |
 | Theme | Light/dark toggle |
+| Footer | The build number on every screen, linking to the project page. One constant feeds it and the console banner, so the two cannot drift |
 | Language | DE/EN toggle in the header, German default, persisted in `localStorage`. Static markup re-applies via `data-i18n`; the active screen re-renders, so nothing on screen stays behind |
 | History | Opt-in, passphrase-gated, encrypted journey history - device-only, zero-knowledge at rest (AES-GCM, PBKDF2). Each verdict saves the ride; matching departures and the remembered exit stop get a "recent" tag. Lock and clear controls on the card; forgotten passphrase = gone, by design. See [`docs/encrypted-history.md`](docs/encrypted-history.md) |
 | Favicon | The app's concept as a mark - a sun half and a shade half. Inline SVG data URI, no icon asset to ship |
@@ -155,6 +156,18 @@ History before v0.10 predates the numbering and is archived by date.
 ### Changelog
 
 ```
+v0.20  2026-09-22  Fixed: the transport filter hid its own options. The chip
+                   row scrolled sideways with the scrollbar hidden for looks,
+                   so on a 390 px phone Bus and Regional sat past the right
+                   edge with nothing on screen saying they existed - reported
+                   from a live board where only four of six chips were
+                   reachable. The row now wraps to two lines and every chip
+                   is visible without a gesture nobody knew to make. Added:
+                   the build number in the footer, linking to the project
+                   page, so a tester reporting "the board looked wrong" can
+                   say which build they were looking at without opening the
+                   console.
+
 v0.19  2026-09-22  VBB granted access to the test system of their official
                    ReST interface, so the Worker now speaks the documented,
                    supported contract as well as the web app's private one
@@ -366,7 +379,7 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.19`, DEVELOPMENT. The full loop works end to end against live
+Prototype, `v0.20`, DEVELOPMENT. The full loop works end to end against live
 data: departures → exit stop → verdict with route spine and shade meter →
 follow-the-ride, with live radar, the best-departure finder, the transport
 filter and opt-in encrypted history, in German and English, deployed at the
