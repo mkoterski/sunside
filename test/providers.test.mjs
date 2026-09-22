@@ -1,4 +1,5 @@
-// Pure-logic tests for the two-provider data layer added in v0.18.
+// Pure-logic tests for the provider data layer: two upstreams since v0.18, the
+// official VBB ReST interface alongside them since v0.19.
 // Run with: node test/providers.test.mjs   (no dependencies, pure Node)
 //
 // These mirror the rules in worker/src/index.js and public/index.html. Every
@@ -113,6 +114,105 @@ eq(productFromCls(4), "tram", "cls 4 is a tram");
 eq(productFromCls(8), "bus", "cls 8 is a bus - including a tram line's replacement service");
 eq(productFromCls(1), "suburban", "cls 1 is the S-Bahn");
 eq(productFromCls(4096), "regional", "an unknown class degrades to regional, not to undefined");
+
+// ── VBB ReST time parsing ────────────────────────────────────────────────────
+// Dates "YYYY-MM-DD", times "HH:MM:SS". The same instants as the mgate side,
+// spelled differently: a board past midnight keeps the service date and counts
+// the hour on instead of prefixing a day offset.
+function restTime(dateStr, timeStr) {
+  if (!dateStr || !timeStr) return null;
+  const [h, mi, sec] = String(timeStr).split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(mi)) return null;
+  const [y, mo, d] = String(dateStr).split("-").map(Number);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return null;
+  return isoBerlin(berlinWallToInstant(
+    y, mo, d + Math.floor(h / 24), h % 24, mi, Number.isFinite(sec) ? sec : 0));
+}
+
+eq(restTime("2026-09-21", "16:47:00"), hafasTime("20260921", "164700"),
+  "the two providers agree on one instant, which is what lets them fall back to each other");
+eq(restTime("2026-01-15", "08:15:00"), "2026-01-15T08:15:00+01:00",
+  "winter time carries +01:00");
+eq(restTime("2026-09-21", "25:10:00"), "2026-09-22T01:10:00+02:00",
+  "hour 25 is 01:10 tomorrow, not an invalid date");
+eq(restTime("2026-09-21", "24:00:00"), "2026-09-22T00:00:00+02:00",
+  "midnight at the end of the service day rolls over rather than staying at hour 24");
+eq(restTime("2026-09-21", null), null, "a missing time stays null, never epoch zero");
+eq(restTime(null, "16:47:00"), null, "a time without its date is not an instant");
+// The DST switch again, since the rollover arithmetic is this function's own.
+eq(restTime("2026-10-25", "01:00:00"), "2026-10-25T01:00:00+02:00",
+  "before the autumn switch the offset is still +02:00");
+eq(restTime("2026-10-25", "04:00:00"), "2026-10-25T04:00:00+01:00",
+  "after the autumn switch it is +01:00");
+
+// ── VBB ReST product and line names ──────────────────────────────────────────
+// `cls` is the mgate bitmask again, but as a string.
+eq(productFromCls(Number("4")), "tram", "a string cls maps through the same table");
+eq(productFromCls(Number(undefined)), "regional", "a missing cls degrades, it does not throw");
+
+const restLineName = (prod, fallback) =>
+  String(prod.line || prod.name || fallback || "?")
+    .replace(/^(bus|tram|str)\s+/i, "").trim() || "?";
+
+eq(restLineName({ line: "M10", name: "STR M10" }), "M10", "the short name is what a rider reads off the vehicle");
+eq(restLineName({ name: "Bus 142" }), "142", "without a short name the mode prefix is stripped");
+eq(restLineName({}, "S41"), "S41", "the departure's own name is the last resort");
+eq(restLineName({}), "?", "nothing at all is a question mark, not 'undefined'");
+eq(restLineName({ line: "S41" }), "S41", "'S41' keeps its S - only a prefix followed by a space is a mode");
+
+// ── VBB ReST nearby: unwrapping and platform collapsing ──────────────────────
+// The service answers per PLATFORM, each row naming its station in
+// `mainMastExtId`. Rows arrive wrapped; older deployments answer a flat list.
+// Records below are trimmed from a live answer for 52.554/13.401 on
+// 2026-09-22 - two Björnsonstr. platforms 40 m apart, one per direction.
+function restStops(body, results = 10) {
+  const list = (body.stopLocationOrCoordLocation || body.StopLocation || [])
+    .map((e) => (e && e.StopLocation) || e)
+    .filter((l) => l && l.lat != null && l.lon != null);
+  const byMast = new Map();
+  for (const l of list) {
+    const mast = l.mainMastExtId || l.extId || l.id;
+    const stop = { id: `v~${mast}`, name: l.name, distance: l.dist != null ? Math.round(Number(l.dist)) : null };
+    const prev = byMast.get(mast);
+    if (!prev || (stop.distance ?? Infinity) < (prev.distance ?? Infinity)) byMast.set(mast, stop);
+  }
+  return [...byMast.values()]
+    .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity))
+    .slice(0, results);
+}
+const PLATFORMS = [
+  { extId: "300424006", mainMastExtId: "900110010", name: "Björnsonstr. (Berlin)", lat: 52.554481, lon: 13.402827, dist: 134 },
+  { extId: "300424007", mainMastExtId: "900110010", name: "Björnsonstr. (Berlin)", lat: 52.554346, lon: 13.40351, dist: 173 },
+  { extId: "300173061", mainMastExtId: "900110011", name: "S Bornholmer Str. (Berlin)", lat: 52.554633, lon: 13.39808, dist: 209 },
+];
+const WRAPPED = { stopLocationOrCoordLocation: PLATFORMS.map((s) => ({ StopLocation: s })) };
+const FLAT = { StopLocation: PLATFORMS };
+
+eq(restStops(WRAPPED).length, 2, "two platforms of one stop are one row, not two of the four slots");
+eq(restStops(WRAPPED)[0].id, "v~900110010", "the row is the mast, which is the id mgate takes too");
+eq(restStops(WRAPPED)[0].distance, 134, "and it keeps the NEAREST platform's walk, not an arbitrary one");
+eq(restStops(FLAT)[0].id, restStops(WRAPPED)[0].id, "the flat shape yields exactly the same id");
+eq(restStops({ stopLocationOrCoordLocation: [{ StopLocation: { extId: "900110007", name: "no coords" } }] }).length, 0,
+  "a hit without coordinates is dropped, not rendered at latitude undefined");
+eq(restStops({ StopLocation: [{ extId: "900110007", name: "no mast", lat: 52.5, lon: 13.4, dist: 90 }] })[0].id,
+  "v~900110007", "a row already at station level keeps its own id");
+
+// ── Namespaced ids ───────────────────────────────────────────────────────────
+// A stop id the two VBB providers share; a journey reference only its issuer
+// understands. That difference is why a board can fall back and a trip cannot.
+function splitId(raw) {
+  const s = decodeURIComponent(raw || "");
+  if (s.startsWith("v~")) return { provider: "vbb", id: s.slice(2) };
+  if (s.startsWith("h~")) return { provider: "hafas", id: s.slice(2) };
+  if (s.startsWith("m~")) return { provider: "motis", id: s.slice(2) };
+  return { provider: "hafas", id: s };
+}
+eq(splitId("v~900110007").provider, "vbb", "the v~ prefix routes to the official interface");
+eq(splitId("v~900110007").id, "900110007", "and hands on the bare station number, which mgate also takes");
+eq(splitId("h~900110007").provider, "hafas", "h~ still routes to mgate");
+eq(splitId("900110007").provider, "hafas", "an unprefixed id bookmarked before v0.18 still works");
+eq(splitId(encodeURIComponent("v~1|129084|0|86|22092026")).id, "1|129084|0|86|22092026",
+  "a journey reference survives the round trip through the URL");
 
 // ── boardingIndex: where the rider gets on ───────────────────────────────────
 // Mirror of the client rule. Four strategies, each covering a case the one

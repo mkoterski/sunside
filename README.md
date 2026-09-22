@@ -1,12 +1,12 @@
-# SunSide Berlin - v0.18
+# SunSide Berlin - v0.19
 
 **Status:** DEVELOPMENT
 **Versioning:** `v0.x` = development/testing, `v1.x` = production-ready
 
 Tells a transit rider which side of the vehicle (left or right, relative to
 direction of travel) stays in the shade. Berlin and Brandenburg run on VBB's
-own data; the rest of Germany, Mecklenburg-Vorpommern included, runs on
-Transitous. Pick a departure near you, say where
+own data, with VBB's official ReST API wired in alongside since v0.19; the
+rest of Germany, Mecklenburg-Vorpommern included, runs on Transitous. Pick a departure near you, say where
 you get off, and the app answers with one sentence: sit on the left, or the
 right. Mobile-first single-page app backed by an edge-cached proxy in front of
 the public VBB API, sized for **10-100 concurrent users at zero cost**.
@@ -19,11 +19,12 @@ the public VBB API, sized for **10-100 concurrent users at zero cost**.
 |---|---|
 | `public/index.html` | the SPA - THIS is the canonical, deployed app |
 | `public/history.js` | encrypted local journey history (F2); see [`docs/encrypted-history.md`](docs/encrypted-history.md) |
-| `worker/src/index.js` | Cloudflare Worker: two upstreams (VBB HAFAS, Transitous), normalised to one API, with caching + single-flight + budget |
+| `worker/src/index.js` | Cloudflare Worker: three upstreams (VBB ReST, VBB HAFAS, Transitous), normalised to one API, with caching + single-flight + budget |
 | `test/` | pure-logic tests: sun-side maths, history module crypto, provider parsing |
 | `wrangler.toml` | one Worker serves BOTH the SPA and `/api/*` |
 | `prototypes/` | numbered self-contained offline prototypes; `prototypes/index.html` is the hub |
-| `docs/` | design brief, encrypted-history threat model, supporting notes |
+| `docs/` | design brief, encrypted-history threat model, [VBB API access](docs/vbb-api-access.md), supporting notes |
+| `.dev.vars.example` | template for the local secrets file; copy to `.dev.vars` (gitignored) |
 
 `prototypes/` (010-015) are exploratory builds, one folder each, every one a
 single `index.html` that opens directly in any browser - no server, no API. Only
@@ -34,11 +35,18 @@ single `index.html` that opens directly in any browser - no server, no API. Only
 
 ```bash
 npm install
+cp .dev.vars.example .dev.vars   # then paste the VBB access id into it
 npx wrangler dev
 ```
 
 Open `http://localhost:8787`. The SPA, proxy and cache behave exactly as in
-production. To bypass the proxy and hit VBB directly (isolating a frontend
+production.
+
+The access id is the one VBB mailed us for their ReST test system. `.dev.vars`
+is gitignored and the id never belongs in the repository or in the SPA - see
+[`docs/vbb-api-access.md`](docs/vbb-api-access.md). Leaving it unset is a
+supported state, not a broken one: the VBB ReST provider switches off and the
+Worker runs on the mgate endpoint and Transitous, exactly as in v0.18. To bypass the proxy and hit VBB directly (isolating a frontend
 bug), add one line before the main script in `public/index.html`:
 
 ```html
@@ -55,8 +63,10 @@ Three suites, no dependencies: the bearing maths and sun-side classification
 (including a curved-route flip scenario); the encrypted history module
 (round-trip, wrong-passphrase rejection, no plaintext at rest, dedup, cap,
 wipe, KDF floor); and the provider layer (stop-id shapes across feeds, HAFAS
-time parsing across both DST switches, and the four boarding-stop rules).
-Should pass before any commit.
+and ReST time parsing across both DST switches and past midnight, the two
+providers agreeing on one instant, ReST response shapes and line names, the
+id namespaces, and the four boarding-stop rules). Should pass before any
+commit.
 
 ## Deploy
 
@@ -64,6 +74,7 @@ Should pass before any commit.
 
 ```bash
 npx wrangler login
+npx wrangler secret put VBB_ACCESS_ID   # once per account; the id VBB mailed us
 npx wrangler deploy
 ```
 
@@ -86,12 +97,12 @@ Worker - but two things still work:
 
 - **One canonical client.** `public/index.html` holds the whole SPA - markup,
   CSS and JS. No build step, no framework, no dependencies.
-- **The Worker talks to the data sources itself.** It speaks VBB's HAFAS
-  protocol and Transitous' REST API directly and normalises both to one shape,
-  so the SPA is provider-agnostic and a bad day at one upstream is not a bad
-  day for the app. Stop and trip ids are namespaced (`h~` / `m~`) and
-  round-trip through the client, which keeps follow-up calls on the provider
-  that issued them. Being the only client also means the load is managed
+- **The Worker talks to the data sources itself.** It speaks VBB's official
+  ReST API, VBB's HAFAS protocol and Transitous' REST API directly and
+  normalises all three to one shape, so the SPA is provider-agnostic and a bad
+  day at one upstream is not a bad day for the app. Stop and trip ids are
+  namespaced (`v~` / `h~` / `m~`) and round-trip through the client, which
+  keeps follow-up calls on the provider that issued them. Being the only client also means the load is managed
   centrally:
   - *Per-endpoint caching* - stop locations for hours, departure boards ~25s,
     trip geometry ~120s, live radar ~8s.
@@ -123,6 +134,7 @@ Worker - but two things still work:
 | Follow the ride | Journey view reached from the verdict: pinned status card (current segment, shade side, clock-estimate vs live-GPS source), the spine with current/passed states, a vertical progress bar, auto-follow with pause, and a replay once arrived. Clock/radar-driven, not a demo timer |
 | Flip warning | When the shaded side genuinely changes mid-trip, the verdict says so instead of averaging it away |
 | Live radar | The actual vehicle's GPS position via VBB radar (Berlin + Brandenburg only). Position, not heading: HAFAS's radar call will not return a passlist, so the bearing comes from stop geometry - which is the better source on anything but a dead-straight single leg |
+| Official data path | VBB's own ReST API under an issued access id since v0.19, as the fallback inside Berlin/Brandenburg and one env var away from leading. It stays second for now because the test system serves timetable data only - no prognoses, no vehicle positions - and live delays are worth more to a rider than provenance. Boards fall back between the two with the stop id unchanged, since both name a stop by its station number |
 | Coverage beyond Berlin | Mecklenburg-Vorpommern and the rest of Germany via Transitous, picked automatically from where you are, with a visible attribution line when it serves |
 | Regional rail | Included since v0.18 - outside Berlin it is often the only service on a route, and a 40-minute regional ride is where the sun side matters most |
 | Best-departure finder | Ranks the next departures of the same line by sun exposure - and says honestly when they barely differ |
@@ -143,6 +155,27 @@ History before v0.10 predates the numbering and is archived by date.
 ### Changelog
 
 ```
+v0.19  2026-09-22  VBB granted access to the test system of their official
+                   ReST interface, so the Worker now speaks the documented,
+                   supported contract as well as the web app's private one
+                   (F9). It is wired in as the fallback inside Berlin and
+                   Brandenburg, not ahead of mgate, and the reason is
+                   measured rather than cautious: the test system carries no
+                   realtime at all - every board answered rtTime null,
+                   planRtTs sits at the epoch, rtMode rejects REALTIME and
+                   journeyPos returns nothing - so leading with it would
+                   trade live delays, the LIVE badge and the radar for better
+                   provenance. VBB_REST_PRIMARY=true promotes it in one step
+                   when the production system is unlocked. Boards fall back
+                   between the two VBB sources with the stop id unchanged,
+                   since both name a stop by its station number; journey
+                   references cannot and say so. Nearby stops arrive per
+                   platform there and are collapsed onto their mast, or two
+                   of the SPA's four stop slots would go to one place. The
+                   access id is a Worker secret, absent from this repository
+                   and from the SPA; without it the provider is off and v0.18
+                   behaviour stands. See docs/vbb-api-access.md.
+
 v0.18  2026-09-21  The Worker now talks to VBB's HAFAS and to Transitous
                    directly instead of proxying v6.vbb.transport.rest (F7/F8).
                    Root cause of the recurring outages: that shared community
@@ -256,6 +289,7 @@ Decided or built, kept here so the IDs are not reused.
 | F5 | 2026-09-21 | Landed in v0.17: transport-type filter chips, multi-select, persisted in `localStorage`. Client-side on purpose - the boards are always fetched with every product enabled, so all filter combinations share one proxy cache key instead of minting an upstream request per combination. |
 | F6 | 2026-09-21 | Landed in v0.18: the SPA shows which upstream served the screen, with the attribution link Transitous asks for. Tied to the `X-Data-Source` header the Worker sets, not guessed from geography. |
 | F7 | 2026-09-21 | Landed in v0.18: VBB HAFAS spoken directly from the Worker, replacing the community REST instance. This is the "self-hosted vbb-rest" item below, arrived at differently - mgate is plain JSON over HTTPS with a static auth blob, so it needs no Node APIs and no second deployment. |
+| F9 | 2026-09-22 | Landed in v0.19: VBB's official ReST API wired in on an access id they issued for their test system, answering the "unofficial endpoint" caveat F7 left standing. Second in the chain rather than first, because the test system has no realtime feed - promoting it is `VBB_REST_PRIMARY=true` once production is unlocked. Kept deliberately reversible: no access id means the provider is off and v0.18 behaviour stands, which is also what keeps a fork working with no credentials. |
 | F8 | 2026-09-21 | Landed in v0.18: Transitous/MOTIS as the second provider - coverage outside Berlin/Brandenburg, and the fallback when HAFAS fails. Open question deliberately left open: Transitous asks to be contacted before real traffic, and describes the service as for open-source non-commercial use. |
 
 ### Architecture upgrades
@@ -266,28 +300,43 @@ The PoC and the future share one diagram -
 - ~~Swap `UPSTREAM` for a self-hosted `vbb-rest` instance~~ - done in v0.18,
   by speaking HAFAS from the Worker rather than hosting a second service.
 - Restore a live bearing. HAFAS's `JourneyGeoPos` rejects `getPasslist`, so
-  the radar gives a position without a heading; VBB's official API exposes
-  `journeyPosition`, which would bring it back on a supported footing.
+  the radar gives a position without a heading. The official interface has the
+  service this needs - `journeyPos` over a rectangle, plus `lastPos` on a
+  journey - but on the test system both are empty of live data, so there is
+  nothing to build against yet. First thing to re-try on production.
 - Move the cache to KV or Redis so it survives restarts and spans isolates.
 - Wire Worker logs into observability - cache hit ratio and upstream 429s
   become signals you watch before they bite.
-- For anything public or commercial: move to the official VBB / GTFS data path
-  and check the data-licence terms.
+- ~~Move to the official VBB data path~~ - done in v0.19, on the test system.
+  Production access still needs unlocking by VBB and agreement to their
+  [terms of use](https://www.vbb.de/vbb-services/api-open-data/api/zugang-produktivsystem/),
+  which is worth reading against this project's non-commercial licence first.
 
 ## Data sources
 
-Two, both spoken to directly by the Worker and normalised to one API shape, so
+Three, all spoken to directly by the Worker and normalised to one API shape, so
 the SPA neither knows nor cares which answered.
 
-**VBB HAFAS** (`fahrinfo.vbb.de/bin/mgate.exe`) for Berlin + Brandenburg. Plain
-JSON over HTTPS with a static auth blob, which is why it runs inside the Worker
-with no Node APIs and no second deployment. It is an unofficial endpoint - fine
-for a hobby project, not guaranteed. For a supported footing, VBB issues API
-credentials on request at `api@vbb.de`.
+**VBB HAFAS** (`fahrinfo.vbb.de/bin/mgate.exe`) for Berlin + Brandenburg, and
+still the first source asked there. Plain JSON over HTTPS with a static auth
+blob, which is why it runs inside the Worker with no Node APIs and no second
+deployment. It is an unofficial endpoint - fine for a hobby project, not
+guaranteed - but it has realtime prognoses and live vehicle positions, and
+until the official interface does too, that is what decides the order.
+
+**VBB ReST** (`vbb.demo.hafas.cloud/api/fahrinfo/latest`) for Berlin +
+Brandenburg, as the fallback since v0.19. VBB's official interface, reached
+with an access id they issued on 2026-09-22 for their test system: documented,
+supported and under terms, which is exactly what mgate is not. The id lives in
+the Worker's secret store and nowhere else. The test system serves timetable
+data only, so `VBB_REST_PRIMARY` stays off until VBB unlocks production. Full
+notes - what falls back to what, why journeys cannot, and the two surprises the
+interface holds - are in [`docs/vbb-api-access.md`](docs/vbb-api-access.md).
 
 **Transitous / MOTIS** (`api.transitous.org`) for everywhere else, including
-Mecklenburg-Vorpommern, and as the fallback when HAFAS fails - the two share no
-infrastructure, so it is a second opinion rather than a retry. It is a publicly
+Mecklenburg-Vorpommern, and as the last fallback when both VBB sources fail -
+it shares no infrastructure with either, so it is a second opinion rather than
+a retry. It is a publicly
 funded community service over DELFI's nationwide GTFS + GTFS-RT. Their usage
 policy asks for a User-Agent naming the app and a contact, and a visible link
 to their sources page; the Worker sends the first and the SPA renders the
@@ -317,7 +366,7 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.18`, DEVELOPMENT. The full loop works end to end against live
+Prototype, `v0.19`, DEVELOPMENT. The full loop works end to end against live
 data: departures → exit stop → verdict with route spine and shade meter →
 follow-the-ride, with live radar, the best-departure finder, the transport
 filter and opt-in encrypted history, in German and English, deployed at the

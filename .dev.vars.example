@@ -1,0 +1,23 @@
+# Local secrets for `npx wrangler dev`. Copy to `.dev.vars`, which is
+# gitignored, and fill in the access id VBB mailed you. Never commit the real
+# file: the id identifies our account to VBB and is rate-limited per account.
+#
+#   cp .dev.vars.example .dev.vars
+#
+# For the deployed Worker the same value goes into the secret store instead:
+#
+#   npx wrangler secret put VBB_ACCESS_ID
+#
+# Leaving this unset is a supported state, not a broken one: the VBB ReST
+# provider switches off and the Worker uses the mgate endpoint and Transitous,
+# exactly as it did in v0.18.
+VBB_ACCESS_ID=
+
+# Optional. Defaults to the test system granted on 2026-09-22; override it to
+# point a local run at the production system once VBB unlocks it.
+# VBB_REST_BASE=https://vbb.demo.hafas.cloud/api/fahrinfo/latest
+
+# Optional. Asks the official interface before mgate. Off by default because
+# the test system has no realtime feed at all - see docs/vbb-api-access.md.
+# Useful locally to exercise the ReST provider end to end.
+# VBB_REST_PRIMARY=true

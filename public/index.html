@@ -177,7 +177,9 @@ header{
 
 /* ── Data-source attribution (F6) ── */
 /* Transitous asks for a visible link to their sources page wherever their
-   data is used. It only appears when MOTIS actually served the screen. */
+   data is used, and VBB's API terms ask that their data be named as the
+   source. The line says whichever is true of the screen in front of you, and
+   stays hidden when the answer came from the mgate endpoint. */
 .attrib{display:none;padding:var(--sp3) var(--sp5) var(--sp5);
   font-size:var(--xs);color:var(--faint);text-align:center;line-height:1.5}
 .attrib.on{display:block}
@@ -512,7 +514,7 @@ button:focus-visible,.dep-card:focus-visible,.stop-item:focus-visible{outline:2p
 
 </main>
 
-<!-- Shown only when Transitous/MOTIS served the data (F6). -->
+<!-- Names the upstream that served this screen, when it asks to be named (F6). -->
 <div class="attrib" id="attrib"></div>
 </div>
 
@@ -560,6 +562,7 @@ de:{
   filterAll:'Alle', filterSbahn:'S-Bahn', filterUbahn:'U-Bahn',
   filterTram:'Tram', filterBus:'Bus', filterRegional:'Regional',
   attribMotis:'Fahrplandaten über <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous</a> (DELFI, Deutschland-weit). Außerhalb von Berlin/Brandenburg keine Live-Fahrzeugortung.',
+  attribVbb:'Fahrplandaten über die <a href="https://www.vbb.de/vbb-services/api-open-data/" target="_blank" rel="noopener">VBB-API</a> (Verkehrsverbund Berlin-Brandenburg).',
   filterAria:p=>`Nur ${p} anzeigen`, filterAllAria:'Alle Verkehrsmittel anzeigen',
   noDepsFilter:'Für diesen Filter fährt gerade nichts ab.',
   filterShowAll:'Alle Verkehrsmittel zeigen',
@@ -647,6 +650,7 @@ en:{
   filterAll:'All', filterSbahn:'S-Bahn', filterUbahn:'U-Bahn',
   filterTram:'Tram', filterBus:'Bus', filterRegional:'Regional',
   attribMotis:'Schedule data via <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous</a> (DELFI, Germany-wide). No live vehicle positions outside Berlin/Brandenburg.',
+  attribVbb:'Schedule data via the <a href="https://www.vbb.de/vbb-services/api-open-data/" target="_blank" rel="noopener">VBB API</a> (Verkehrsverbund Berlin-Brandenburg).',
   filterAria:p=>`Show ${p} only`, filterAllAria:'Show all transport types',
   noDepsFilter:'Nothing departing for this filter right now.',
   filterShowAll:'Show all transport types',
@@ -807,18 +811,22 @@ function histSaveTrip(dep,fromStop,toStop){
 
 // ── State ──────────────────────────────────────────────
 // API base is configurable. By default it points at the local proxy path "/api",
-// which the Cloudflare Worker serves. Since v0.18 the Worker speaks to VBB's
-// HAFAS and to Transitous itself, so there is no longer a public REST upstream
-// a browser could call directly - a GitHub Pages copy therefore points at the
-// deployed Worker, which allows that origin explicitly in its CORS check.
+// which the Cloudflare Worker serves. Since v0.18 the Worker speaks to VBB and
+// to Transitous itself, so there is no longer a public REST upstream a browser
+// could call directly - a GitHub Pages copy therefore points at the deployed
+// Worker, which allows that origin explicitly in its CORS check. Since v0.19
+// the VBB side runs on an access-controlled API, which is a second reason the
+// browser cannot go direct: the access id belongs in the Worker, not in a page
+// anyone can view the source of.
 const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
   ||(typeof location!=='undefined'&&location.hostname.endsWith('github.io')
       ?'https://sunside-berlin.mkoterski.workers.dev/api':'/api');
-console.log('SunSide Berlin v0.18 - API base:',API);
+console.log('SunSide Berlin v0.19 - API base:',API);
 
-// Which upstream served the current board: 'hafas' (VBB direct) or 'motis'
-// (Transitous). Drives the attribution footer, and explains to the rider why
-// live vehicle positions are missing outside Berlin/Brandenburg.
+// Which upstream served the current board: 'vbb' (the official VBB ReST API),
+// 'hafas' (VBB's mgate endpoint) or 'motis' (Transitous). Drives the
+// attribution footer, and explains to the rider why live vehicle positions are
+// missing outside Berlin/Brandenburg.
 let dataSource=null;
 let uLat=null,uLon=null;
 // How the current position was obtained, and the fix itself. Refresh re-reads
@@ -992,9 +1000,12 @@ function setLocLabel(){
 function renderAttrib(){
   const el=document.getElementById('attrib');
   if(!el)return;
-  const on=dataSource==='motis';
-  el.classList.toggle('on',on);
-  el.innerHTML=on?t('attribMotis'):'';
+  // 'vbb' is the official VBB ReST interface, 'motis' is Transitous; both name
+  // themselves. 'hafas' is VBB's own data too, but reached through their web
+  // app's endpoint rather than under the API terms, so it makes no claim here.
+  const key=dataSource==='motis'?'attribMotis':dataSource==='vbb'?'attribVbb':null;
+  el.classList.toggle('on',Boolean(key));
+  el.innerHTML=key?t(key):'';
 }
 
 // ── Product filter (F5) ──────────────────────

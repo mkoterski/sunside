@@ -1,8 +1,8 @@
 /**
  * SunSide Berlin - edge data layer for transit departures.
  *
- * Two upstreams, one API
- * ----------------------
+ * Three upstreams, one API
+ * ------------------------
  * Until v0.17 this Worker proxied `https://v6.vbb.transport.rest`, a shared
  * community instance. That instance was the single biggest source of
  * user-facing breakage: measured on 2026-09-21, VBB's own HAFAS answered a
@@ -13,23 +13,38 @@
  *
  * So this Worker now talks to the data sources itself:
  *
- *   HAFAS  - VBB's own mgate endpoint, for Berlin + Brandenburg. The protocol
- *            is plain JSON over HTTPS with a static auth blob, so it needs no
- *            Node APIs and runs inside the Worker. "Self-hosted" with no
- *            second deployment: no container, no VPS, still the free tier.
+ *   VBB    - the official VBB ReST interface. VBB granted access to their
+ *            test system on 2026-09-22, so since v0.19 the Worker speaks the
+ *            sanctioned, documented contract as well as the web app's private
+ *            protocol. It is reached with a personal access id, which lives in
+ *            the Worker's secret store and never in this repository. Without
+ *            that secret the provider is simply off and the Worker behaves
+ *            exactly as it did in v0.18 - see docs/vbb-api-access.md.
+ *
+ *            It backs mgate up rather than replacing it, because the test
+ *            system serves timetable data only: no prognoses, no vehicle
+ *            positions. Promoting it is one env var (VBB_REST_PRIMARY) and is
+ *            what the production system is for.
+ *
+ *   HAFAS  - VBB's own mgate endpoint, for Berlin + Brandenburg, and still the
+ *            first source asked there. The protocol is plain JSON over HTTPS
+ *            with a static auth blob, so it needs no Node APIs and runs inside
+ *            the Worker. "Self-hosted" with no second deployment: no
+ *            container, no VPS, still the free tier. It has realtime and it
+ *            has the radar, which is the whole reason it still leads.
  *
  *   MOTIS  - api.transitous.org, a publicly funded community service over
- *            DELFI's nationwide GTFS + GTFS-RT. Covers what HAFAS does not:
- *            Mecklenburg-Vorpommern and the rest of Germany. Also the fallback
- *            when HAFAS fails, since the two share no infrastructure.
+ *            DELFI's nationwide GTFS + GTFS-RT. Covers what the other two do
+ *            not: Mecklenburg-Vorpommern and the rest of Germany. Also the
+ *            last fallback, since it shares no infrastructure with either.
  *
- * Both are normalised to the same response shapes, so the SPA neither knows
- * nor cares which answered. Stop and trip ids are namespaced (`h~` / `m~`) and
- * round-trip through the client, which is what keeps follow-up calls on the
- * provider that issued them.
+ * All three are normalised to the same response shapes, so the SPA neither
+ * knows nor cares which answered. Stop and trip ids are namespaced (`v~` /
+ * `h~` / `m~`) and round-trip through the client, which is what keeps
+ * follow-up calls on the provider that issued them.
  *
  * What the split costs: MOTIS exposes no live vehicle positions, so the radar
- * strip is HAFAS-only. Outside Berlin/Brandenburg the app falls back to stop
+ * strip is mgate-only. Outside Berlin/Brandenburg the app falls back to stop
  * geometry for the bearing - which is what it already does for multi-leg rides.
  *
  * Cost: still entirely on Cloudflare's free tier. No KV, no paid add-ons.
@@ -84,6 +99,38 @@ const HAFAS_BITS = {
 };
 const HAFAS_ALL_PRODUCTS = 127;
 
+// ── Provider: VBB ReST (official) ────────────────────────────────────────────
+// The test system VBB gave us on 2026-09-22, running HAFAS ReST v2.45. The
+// base is a var rather than a constant for one reason: when VBB unlocks the
+// production system the move is a `wrangler.toml` edit and a new secret, not a
+// code change. Everything below speaks the documented interface, which both
+// systems serve.
+const VBB_REST_DEFAULT_BASE = 'https://vbb.demo.hafas.cloud/api/fahrinfo/latest';
+
+// Read per request: Workers hand `env` to `fetch`, and secrets are only
+// readable there. `enabled` is the whole feature flag - no access id, no
+// provider, and the v0.18 behaviour stands untouched.
+//
+// `primary` decides the order inside Berlin/Brandenburg, and it is off by
+// default for one measured reason: the test system carries no realtime feed.
+// Every board it answered on 2026-09-22 had `rtTime: null` and `planRtTs` at
+// the epoch, `rtMode` accepts only OFF and SERVER_DEFAULT, and `journeyPos`
+// returns no journeys at all. Asking it first would trade live delays, the
+// LIVE badge and the radar for a nicer provenance, which is a worse app. So
+// mgate keeps the lead and the official interface backs it up - until the
+// production system is unlocked, where realtime is the point of the exercise:
+// set VBB_REST_PRIMARY=true then, and check one board against mgate.
+function vbbConfig(env) {
+  const accessId = String((env && env.VBB_ACCESS_ID) || '');
+  const base = String((env && env.VBB_REST_BASE) || VBB_REST_DEFAULT_BASE).replace(/\/+$/, '');
+  return {
+    enabled: Boolean(accessId),
+    primary: String((env && env.VBB_REST_PRIMARY) || '') === 'true',
+    base,
+    accessId,
+  };
+}
+
 // ── Provider: MOTIS (Transitous) ─────────────────────────────────────────────
 const MOTIS_BASE = 'https://api.transitous.org';
 
@@ -92,7 +139,7 @@ const MOTIS_BASE = 'https://api.transitous.org';
 // also asks for a visible link to transitous.org/sources, which the SPA
 // renders whenever MOTIS served the data.
 const MOTIS_UA =
-  'sunside-berlin/0.18 (+https://github.com/mkoterski/sunside; matthias.koterski@nextwind.de)';
+  'sunside-berlin/0.19 (+https://github.com/mkoterski/sunside; matthias.koterski@nextwind.de)';
 
 // GTFS route types as MOTIS names them, mapped onto the product vocabulary the
 // SPA already uses for badge colours and the filter chips.
@@ -118,6 +165,7 @@ const MOTIS_PRODUCTS = {
 const memCache = new Map(); // key -> { body, source, expires }
 const inflight = new Map(); // key -> Promise (single-flight)
 const buckets = {
+  vbb:   { tokens: BUDGET.capacity, last: Date.now() },
   hafas: { tokens: BUDGET.capacity, last: Date.now() },
   motis: { tokens: BUDGET.capacity, last: Date.now() },
 };
@@ -376,6 +424,180 @@ async function hafasRadar({ north, south, east, west, results, products }, signa
   return { movements };
 }
 
+// ── VBB ReST ─────────────────────────────────────────────────────────────────
+// One GET helper for the whole interface: every service takes its arguments in
+// the query string and answers JSON. The access id is appended here and only
+// here, so no call site can forget it - and no error message can leak it,
+// which is why nothing below ever puts the request URL into a thrown message.
+// Those messages are handed to the client verbatim by the error handler.
+async function restGet(cfg, path, params, signal) {
+  const url = new URL(cfg.base + path);
+  for (const k in params) if (params[k] != null) url.searchParams.set(k, String(params[k]));
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('accessId', cfg.accessId);
+
+  let res;
+  try {
+    res = await fetch(url, { headers: { 'Accept': 'application/json' }, signal });
+  } catch (e) {
+    throw new Error(`vbb ${path}: ${e.name === 'TimeoutError' ? 'timeout' : 'fetch failed'}`);
+  }
+  if (!res.ok) throw new Error(`vbb http ${res.status}`);
+  const body = await res.json();
+  // The interface reports its own failures in the body (API_AUTH for a bad or
+  // expired access id, API_QUOTA when the test system's allowance is spent),
+  // sometimes under HTTP 200. Surfacing the code is what makes a mail to VBB
+  // useful, since they ask for the request, the answer and the URL.
+  if (body && (body.errorCode || body.errorText)) {
+    throw new Error(`vbb ${body.errorCode || 'error'}`);
+  }
+  return body || {};
+}
+
+// ReST dates are "YYYY-MM-DD", times "HH:MM:SS". A board running past midnight
+// keeps the service date and counts the hour on ("25:10:00") where mgate
+// prefixes a day offset instead - the same idea, differently spelled, and both
+// land on the same instant through the Berlin wall-clock conversion.
+function restTime(dateStr, timeStr) {
+  if (!dateStr || !timeStr) return null;
+  const [h, mi, sec] = String(timeStr).split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(mi)) return null;
+  const [y, mo, d] = String(dateStr).split('-').map(Number);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return null;
+  return isoBerlin(berlinWallToInstant(
+    y, mo, d + Math.floor(h / 24), h % 24, mi, Number.isFinite(sec) ? sec : 0,
+  ));
+}
+
+// `Product` is an array on the departure board and an object on a journey, and
+// older deployments send only the flat `ProductAtStop`. Take whichever is
+// there rather than making every call site care.
+function restProduct(row) {
+  const p = row.Product || row.ProductAtStop;
+  return (Array.isArray(p) ? p[0] : p) || {};
+}
+
+// `cls` is the same bitmask mgate reports, so one product mapping serves both
+// providers. It arrives as a string here, hence the Number().
+const restProductName = (prod) => productFromCls(Number(prod.cls));
+
+// `line` is the name a rider reads off the vehicle ("M10", "S41"); `name` is
+// the long form ("STR M10", "Bus 142"). Prefer the short one, and strip the
+// redundant mode prefix from the long one the way the mgate side does.
+const restLineName = (prod, fallback) =>
+  String(prod.line || prod.name || fallback || '?')
+    .replace(/^(bus|tram|str)\s+/i, '').trim() || '?';
+
+async function vbbNearby({ lat, lon, distance, results, cfg }, signal) {
+  const body = await restGet(cfg, '/location.nearbystops', {
+    originCoordLat: lat.toFixed(6),
+    originCoordLong: lon.toFixed(6),
+    r: Math.round(distance),
+    // Platforms collapse onto their mast below, so ask for enough rows that
+    // the collapse still leaves `results` distinct stations.
+    maxNo: Math.min(results * 4, 50),
+    type: 'S', // stops only, no points of interest
+    // Not optional, whatever it looks like: without `products` this service
+    // answers 200 with no `stopLocationOrCoordLocation` at all. An empty list
+    // and no error code is a silent nothing, and it is what a first attempt
+    // at this call looks like from the outside.
+    products: HAFAS_ALL_PRODUCTS,
+  }, signal);
+
+  // Hits arrive wrapped in `stopLocationOrCoordLocation[].StopLocation`; a
+  // flat `StopLocation[]` is accepted too, which is what older deployments
+  // answer. Both unwrap to the same record.
+  const list = (body.stopLocationOrCoordLocation || body.StopLocation || [])
+    .map((e) => (e && e.StopLocation) || e)
+    .filter((l) => l && l.lat != null && l.lon != null);
+
+  // This service answers per PLATFORM: two Björnsonstr. rows 40 m apart, one
+  // per tram direction, each carrying `mainMastExtId` for the station they
+  // belong to. Left in, they are two board requests for one place and two of
+  // the four slots the SPA fans out to - the same bug the MOTIS side already
+  // groups its way out of. The mast id is also the number mgate takes
+  // (900110010), which is what lets a board fall back between the two VBB
+  // providers with the id exactly as it came in.
+  const byMast = new Map();
+  for (const l of list) {
+    const mast = l.mainMastExtId || l.extId || l.id;
+    const stop = {
+      type: 'stop',
+      id: `v~${mast}`,
+      name: l.name,
+      // The nearest platform's coordinates, not the mast's: that is the point
+      // the rider walks to, and it is what `dist` is measured against.
+      location: { type: 'location', latitude: Number(l.lat), longitude: Number(l.lon) },
+      distance: l.dist != null ? Math.round(Number(l.dist)) : null,
+    };
+    const prev = byMast.get(mast);
+    if (!prev || (stop.distance ?? Infinity) < (prev.distance ?? Infinity)) byMast.set(mast, stop);
+  }
+  return [...byMast.values()]
+    .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity))
+    .slice(0, results);
+}
+
+async function vbbDepartures({ id, duration, results, products, cfg }, signal) {
+  const body = await restGet(cfg, '/departureBoard', {
+    extId: id,
+    duration,
+    maxJourneys: results,
+    products,
+    // No `rtMode`: this deployment accepts only OFF and SERVER_DEFAULT and
+    // answers API_PARAM for anything else. Its default is what we want anyway.
+  }, signal);
+
+  const departures = (body.Departure || []).map((d) => {
+    const prod = restProduct(d);
+    const product = restProductName(prod);
+    const plannedWhen = restTime(d.date, d.time);
+    // A prognosis carries its own date, because a delay can push a 23:58
+    // departure into tomorrow.
+    const when = restTime(d.rtDate || d.date, d.rtTime) || plannedWhen;
+    const ref = d.JourneyDetailRef && d.JourneyDetailRef.ref;
+    return {
+      // Without a journey reference the follow-the-ride screen has nothing to
+      // ask for, so the row is dropped below rather than shown as a card that
+      // dead-ends on tap.
+      tripId: ref ? `v~${ref}` : null,
+      direction: renameRingbahn(product, d.direction || null),
+      when,
+      plannedWhen,
+      // Same rule as on the mgate side: no prognosis, no delay. An on-time
+      // zero inferred from a timetable would make the LIVE badge a lie.
+      delay: d.rtTime ? secondsBetween(when, plannedWhen) : null,
+      line: { type: 'line', name: restLineName(prod, d.name), product },
+    };
+  }).filter((d) => d.when && d.tripId);
+
+  return { departures };
+}
+
+// Journey stops are named per platform (300441004) while a board is asked for
+// by mast (900110010), so the boarding stop is generally NOT found by id here.
+// That is already handled rather than newly broken: the client's boarding rule
+// falls through to the scheduled time, which both documents state identically.
+async function vbbTrip({ id, cfg }, signal) {
+  const body = await restGet(cfg, '/journeyDetail', { id }, signal);
+  const stops = (body.Stops && body.Stops.Stop) || [];
+  const stopovers = stops.map((s) => ({
+    stop: {
+      type: 'stop',
+      id: s.extId ? `v~${s.extId}` : null,
+      name: s.name,
+      location: s.lat != null
+        ? { type: 'location', latitude: Number(s.lat), longitude: Number(s.lon) }
+        : null,
+    },
+    arrival: restTime(s.rtArrDate || s.arrDate, s.rtArrTime) || restTime(s.arrDate, s.arrTime),
+    plannedArrival: restTime(s.arrDate, s.arrTime),
+    departure: restTime(s.rtDepDate || s.depDate, s.rtDepTime) || restTime(s.depDate, s.depTime),
+    plannedDeparture: restTime(s.depDate, s.depTime),
+  }));
+  return { trip: { id: `v~${id}`, stopovers } };
+}
+
 // ── MOTIS ────────────────────────────────────────────────────────────────────
 async function motisGet(path, params, signal) {
   const url = new URL(MOTIS_BASE + path);
@@ -532,6 +754,11 @@ async function motisRadar() {
 }
 
 const PROVIDERS = {
+  // Radar never routes through this table - the handler calls hafasRadar and
+  // spends the mgate budget directly - which is also the honest entry here:
+  // the ReST services we were granted cover boards and journeys, not live
+  // vehicle positions.
+  vbb:   { nearby: vbbNearby,   departures: vbbDepartures,   trip: vbbTrip,   radar: hafasRadar },
   hafas: { nearby: hafasNearby, departures: hafasDepartures, trip: hafasTrip, radar: hafasRadar },
   motis: { nearby: motisNearby, departures: motisDepartures, trip: motisTrip, radar: motisRadar },
 };
@@ -559,10 +786,11 @@ function num(sp, key, dflt) {
 }
 
 // Split a namespaced id back into its provider and that provider's own id. An
-// id with no prefix is treated as HAFAS, which keeps anything bookmarked
+// id with no prefix is treated as mgate HAFAS, which keeps anything bookmarked
 // before v0.18 working.
 function splitId(raw) {
   const s = decodeURIComponent(raw || '');
+  if (s.startsWith('v~')) return { provider: 'vbb', id: s.slice(2) };
   if (s.startsWith('h~')) return { provider: 'hafas', id: s.slice(2) };
   if (s.startsWith('m~')) return { provider: 'motis', id: s.slice(2) };
   return { provider: 'hafas', id: s };
@@ -639,10 +867,11 @@ function withCors(resp, request) {
 }
 
 // ── Routing ──────────────────────────────────────────────────────────────────
-async function handleApi(url) {
+async function handleApi(url, env) {
   const path = url.pathname.slice('/api/'.length).replace(/^\/+/, '');
   const sp = url.searchParams;
   const products = parseProducts(sp);
+  const cfg = vbbConfig(env);
 
   // Nearby stops. This is the only call that picks a provider from geography;
   // every later call follows the id the SPA received from here.
@@ -654,26 +883,33 @@ async function handleApi(url) {
     }
     const distance = Math.min(num(sp, 'distance', 700), 2000);
     const results = Math.min(num(sp, 'results', 10), 25);
-    const args = { lat, lon, distance, results };
-    const primary = inVbbArea(lat, lon) ? 'hafas' : 'motis';
+    const args = { lat, lon, distance, results, cfg };
+    // Inside Berlin/Brandenburg both VBB sources are asked before MOTIS;
+    // outside, neither knows anything and MOTIS is the only source. Order
+    // within the pair is cfg.primary, which is off while we are on the test
+    // system - see vbbConfig. Each step is different infrastructure, so a step
+    // down the chain is a second opinion, never a retry of the same one.
+    const chain = inVbbArea(lat, lon)
+      ? (cfg.enabled ? (cfg.primary ? ['vbb', 'hafas', 'motis'] : ['hafas', 'vbb', 'motis'])
+                     : ['hafas', 'motis'])
+      : ['motis'];
     const keyOf = (p) => `nearby|${p}|${lat.toFixed(3)}|${lon.toFixed(3)}|${distance}|${results}`;
 
-    try {
-      const r = await served(keyOf(primary), TTL.nearby, primary, (s) => PROVIDERS[primary].nearby(args, s));
-      if (r.body.length) {
-        return jsonResp(r.body, 200, { 'X-Cache': r.cache, 'X-Data-Source': r.source });
+    for (const provider of chain) {
+      try {
+        const r = await served(keyOf(provider), TTL.nearby, provider,
+          (s) => PROVIDERS[provider].nearby(args, s));
+        // An empty list is not an answer worth returning while another source
+        // is left to ask: it is what a stop just outside one feed looks like.
+        if (r.body.length || provider === chain[chain.length - 1]) {
+          return jsonResp(r.body, 200, { 'X-Cache': r.cache, 'X-Data-Source': r.source });
+        }
+      } catch (e) {
+        if (e.status === 503) throw e;
+        if (provider === chain[chain.length - 1]) throw e;
       }
-    } catch (e) {
-      if (e.status === 503) throw e;
     }
-    // Either HAFAS failed or it knows nothing here. MOTIS shares no
-    // infrastructure with it, so this is a second opinion rather than a retry -
-    // and outside Berlin/Brandenburg it is the only one with data at all.
-    if (primary === 'hafas') {
-      const r = await served(keyOf('motis'), TTL.nearby, 'motis', (s) => motisNearby(args, s));
-      return jsonResp(r.body, 200, { 'X-Cache': r.cache, 'X-Data-Source': r.source });
-    }
-    return jsonResp([], 200, { 'X-Data-Source': primary });
+    return jsonResp([], 200, { 'X-Data-Source': chain[chain.length - 1] });
   }
 
   const depMatch = path.match(/^stops\/(.+)\/departures$/);
@@ -681,17 +917,39 @@ async function handleApi(url) {
     const { provider, id } = splitId(depMatch[1]);
     const duration = Math.min(num(sp, 'duration', 35), 180);
     const results = Math.min(num(sp, 'results', 12), 60);
-    const args = { id, duration, results, products: products.mask, productSet: products.set };
-    const key = `dep|${provider}|${id}|${duration}|${results}|${products.mask}`;
-    const r = await served(key, TTL.departures, provider, (s) => PROVIDERS[provider].departures(args, s));
-    return jsonResp(r.body, 200, { 'X-Cache': r.cache, 'X-Data-Source': r.source });
+    const args = { id, duration, results, products: products.mask, productSet: products.set, cfg };
+    // Both VBB providers name a stop by its station number, so a board asked
+    // of one can be answered by the other with the id exactly as it came in.
+    // That covers the test system being down mid-journey, and an id bookmarked
+    // while the access id was configured and opened after it was withdrawn.
+    const chain = provider === 'vbb'
+      ? (cfg.enabled ? ['vbb', 'hafas'] : ['hafas'])
+      : [provider];
+    let lastErr;
+    for (const p of chain) {
+      const key = `dep|${p}|${id}|${duration}|${results}|${products.mask}`;
+      try {
+        const r = await served(key, TTL.departures, p, (s) => PROVIDERS[p].departures(args, s));
+        return jsonResp(r.body, 200, { 'X-Cache': r.cache, 'X-Data-Source': r.source });
+      } catch (e) {
+        if (e.status === 503) throw e;
+        lastErr = e;
+      }
+    }
+    throw lastErr;
   }
 
   const tripMatch = path.match(/^trips\/(.+)$/);
   if (tripMatch) {
     const { provider, id } = splitId(tripMatch[1]);
+    // A journey reference is a token of the system that issued it, so unlike a
+    // stop id it cannot be handed to another provider. If the access id is
+    // gone, say so rather than asking mgate a question it cannot parse.
+    if (provider === 'vbb' && !cfg.enabled) {
+      return jsonResp({ error: 'this trip id needs the VBB ReST API, which is not configured' }, 503);
+    }
     const key = `trip|${provider}|${id}`;
-    const r = await served(key, TTL.trip, provider, (s) => PROVIDERS[provider].trip({ id }, s));
+    const r = await served(key, TTL.trip, provider, (s) => PROVIDERS[provider].trip({ id, cfg }, s));
     return jsonResp(r.body, 200, { 'X-Cache': r.cache, 'X-Data-Source': r.source });
   }
 
@@ -739,10 +997,18 @@ export default {
     if (isHealth) {
       const tokensRemaining = {};
       for (const name in buckets) tokensRemaining[name] = Math.floor(refill(name).tokens);
+      const cfg = vbbConfig(env);
       return withCors(jsonResp({
         ok: true,
-        version: '0.18',
-        upstreams: { hafas: HAFAS_ENDPOINT, motis: MOTIS_BASE },
+        version: '0.19',
+        // The base is operational information worth seeing (test system or
+        // production?); the access id is never reported, here or anywhere.
+        upstreams: {
+          vbb: cfg.enabled ? cfg.base : null,
+          hafas: HAFAS_ENDPOINT,
+          motis: MOTIS_BASE,
+        },
+        vbbRest: { configured: cfg.enabled, primary: cfg.primary },
         tokensRemaining,
         cacheEntries: memCache.size,
         inflight: inflight.size,
@@ -751,7 +1017,7 @@ export default {
 
     if (isApi) {
       try {
-        return withCors(await handleApi(url), request);
+        return withCors(await handleApi(url, env), request);
       } catch (e) {
         const status = e.status || 502;
         const extra = status === 503 ? { 'Retry-After': '2' } : {};
