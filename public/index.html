@@ -26,6 +26,7 @@
   --sh-sm:0 1px 3px oklch(0.2 0.01 80/0.07);
   --sh-md:0 4px 16px oklch(0.2 0.01 80/0.09);
   --sh-lg:0 12px 40px oklch(0.2 0.01 80/0.14);
+  --bw:1px;
   --r-sm:0.375rem;--r-md:0.625rem;--r-lg:1rem;--r-xl:1.375rem;--r-full:9999px;
   --ease:180ms cubic-bezier(0.16,1,0.3,1);
   --font:'DM Sans',system-ui,sans-serif;
@@ -79,6 +80,13 @@
   /* Shadows read as smudges under glare, and they were doing the work of
      separating cards. Borders take that job over, below. */
   --sh-sm:none;--sh-md:none;--sh-lg:none;
+  /* Border weight for the edges this mode draws solid. 2px was heavier than
+     the job needs: at this ink an edge is found by its contrast, not by its
+     mass, and the extra pixel mostly crowded the content inside it. One pixel
+     of near-black is nothing like the 1px the other themes draw at 11% alpha -
+     that is the hairline glare eats, this is a line. 1.5px was tried first and
+     Chromium reports it back as 1px anyway, so the honest value is 1px. */
+  --bw:1px;
   /* One step up the scale. Sunlight scatters in the eye and thin small type
      is what goes first. */
   --xs:clamp(0.8125rem,0.78rem + 0.2vw,0.9375rem);
@@ -90,16 +98,18 @@
 /* Structure, not just colour: edges that survive glare, and weight that keeps
    its shape when the eye is squinting. */
 [data-theme="sun"] body{font-weight:500}
-[data-theme="sun"] header{box-shadow:none;border-bottom:2px solid var(--border)}
-[data-theme="sun"] .icon-btn{color:var(--text);border:2px solid var(--border)}
-[data-theme="sun"] #sun-bar{border-bottom:2px solid var(--sun-border);
+[data-theme="sun"] header{box-shadow:none;border-bottom:var(--bw) solid var(--border)}
+[data-theme="sun"] .icon-btn{color:var(--text);border:var(--bw) solid var(--border)}
+[data-theme="sun"] #sun-bar{border-bottom:var(--bw) solid var(--sun-border);
   color:var(--text);font-weight:600}
-[data-theme="sun"] .dep-card{border-width:2px}
+[data-theme="sun"] .dep-card{border-width:var(--bw)}
 [data-theme="sun"] .dep-dest{font-weight:800}
 [data-theme="sun"] .dep-stop{color:var(--muted);font-weight:600}
 [data-theme="sun"] .dep-stop .ds-walk{color:var(--muted)}
-[data-theme="sun"] .line-badge{font-weight:900;border:2px solid oklch(0 0 0/0.35)}
-[data-theme="sun"] .chip{border:2px solid var(--border);color:var(--text);font-weight:800}
+/* The badge outline only has to separate a saturated block from white paper,
+   which one pixel does. */
+[data-theme="sun"] .line-badge{font-weight:900;border:1px solid oklch(0 0 0/0.35)}
+[data-theme="sun"] .chip{border:var(--bw) solid var(--border);color:var(--text);font-weight:800}
 [data-theme="sun"] .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 [data-theme="sun"] .chip[disabled]{opacity:.62}
 /* 10px type on a 15%-alpha tint is the smallest, palest thing on the board.
@@ -1064,7 +1074,7 @@ const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
 // One constant for both places the build shows itself: the console banner and
 // the footer. Two hand-edited strings drift, and a footer that lies about the
 // build is worse than no footer.
-const APP_VERSION='0.24';
+const APP_VERSION='0.25';
 console.log(`SunSide Berlin v${APP_VERSION} - API base:`,API);
 
 // Project page rather than the repository: it is the page that explains what

@@ -1,4 +1,4 @@
-# SunSide Berlin - v0.24
+# SunSide Berlin - v0.25
 
 **Status:** DEVELOPMENT
 **Versioning:** `v0.x` = development/testing, `v1.x` = production-ready
@@ -158,6 +158,14 @@ History before v0.10 predates the numbering and is archived by date.
 ### Changelog
 
 ```
+v0.25  2026-09-24  Sun mode's borders go from 2px to 1px, on one token
+                   (--bw) rather than six rules. At near-black ink an edge is
+                   found by its contrast, not its mass, and the second pixel
+                   was crowding the content inside it - which is not the same
+                   1px the other themes draw at 11% alpha, the hairline glare
+                   eats. The line badges drop to 1px too: separating a
+                   saturated block from white paper needs no more.
+
 v0.24  2026-09-24  The rest of the exit screen's real estate. The journey
                    summary and the vehicle position were two bordered boxes
                    with a gap between them, and together with a dead margin
@@ -464,7 +472,7 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.24`, DEVELOPMENT. The full loop works end to end against live
+Prototype, `v0.25`, DEVELOPMENT. The full loop works end to end against live
 data: departures → exit stop → verdict with route spine and shade meter →
 follow-the-ride, with live radar, the best-departure finder, the transport
 filter and opt-in encrypted history, in German and English, deployed at the
