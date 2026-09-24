@@ -4,12 +4,15 @@
 **Versioning:** `v0.x` = development/testing, `v1.x` = production-ready
 
 Tells a transit rider which side of the vehicle (left or right, relative to
-direction of travel) stays in the shade. Berlin and Brandenburg run on VBB's
-own data, with VBB's official ReST API wired in alongside since v0.19; the
-rest of Germany, Mecklenburg-Vorpommern included, runs on Transitous. Pick a departure near you, say where
+direction of travel) stays in the shade. Pick a departure near you, say where
 you get off, and the app answers with one sentence: sit on the left, or the
-right. Mobile-first single-page app backed by an edge-cached proxy in front of
-the public VBB API, sized for **10-100 concurrent users at zero cost**.
+right.
+
+Berlin and Brandenburg run on VBB's own data - the official ReST API under an
+issued access id since v0.19, with VBB's own mgate endpoint in front of it for
+now; the rest of Germany, Mecklenburg-Vorpommern included, runs on Transitous.
+Mobile-first single-page app in front of an edge-cached Worker that speaks to
+all three sources itself, sized for **10-100 concurrent users at zero cost**.
 
 **Try it:** [sunside-berlin.mkoterski.workers.dev](https://sunside-berlin.mkoterski.workers.dev)
 
@@ -20,7 +23,7 @@ the public VBB API, sized for **10-100 concurrent users at zero cost**.
 | `public/index.html` | the SPA - THIS is the canonical, deployed app |
 | `public/history.js` | encrypted local journey history (F2); see [`docs/encrypted-history.md`](docs/encrypted-history.md) |
 | `worker/src/index.js` | Cloudflare Worker: three upstreams (VBB ReST, VBB HAFAS, Transitous), normalised to one API, with caching + single-flight + budget |
-| `test/` | pure-logic tests: sun-side maths, history module crypto, provider parsing |
+| `test/` | pure-logic tests: sun-side maths and the sun-elevation theme rule, history module crypto, provider parsing |
 | `wrangler.toml` | one Worker serves BOTH the SPA and `/api/*` |
 | `prototypes/` | numbered self-contained offline prototypes; `prototypes/index.html` is the hub |
 | `docs/` | design brief, encrypted-history threat model, [VBB API access](docs/vbb-api-access.md), supporting notes |
@@ -46,12 +49,19 @@ The access id is the one VBB mailed us for their ReST test system. `.dev.vars`
 is gitignored and the id never belongs in the repository or in the SPA - see
 [`docs/vbb-api-access.md`](docs/vbb-api-access.md). Leaving it unset is a
 supported state, not a broken one: the VBB ReST provider switches off and the
-Worker runs on the mgate endpoint and Transitous, exactly as in v0.18. To bypass the proxy and hit VBB directly (isolating a frontend
-bug), add one line before the main script in `public/index.html`:
+Worker runs on the mgate endpoint and Transitous, exactly as in v0.18.
+
+To point the local SPA at a Worker other than the one serving it - the
+deployed instance, say, while editing the page - set the API base before the
+main script in `public/index.html`:
 
 ```html
-<script>window.SUNSIDE_API='https://v6.vbb.transport.rest'</script>
+<script>window.SUNSIDE_API='https://sunside-berlin.mkoterski.workers.dev/api'</script>
 ```
+
+There is no public REST upstream to point it at instead. Until v0.17 this line
+named `v6.vbb.transport.rest`; that instance is exactly what v0.18 removed, and
+why - see [Why not the community REST instance](#why-not-the-community-rest-instance).
 
 ### Tests
 
@@ -60,8 +70,10 @@ npm test
 ```
 
 Three suites, no dependencies: the bearing maths and sun-side classification
-(including a curved-route flip scenario); the encrypted history module
-(round-trip, wrong-passphrase rejection, no plaintext at rest, dedup, cap,
+(including a curved-route flip scenario) plus the sun-elevation theme rule
+with its hysteresis band; the encrypted history module (round-trip,
+wrong-passphrase rejection, no plaintext at rest - with a positive control
+that writes a plaintext field and asserts the check catches it - dedup, cap,
 wipe, KDF floor); and the provider layer (stop-id shapes across feeds, HAFAS
 and ReST time parsing across both DST switches and past midnight, the two
 providers agreeing on one instant, ReST response shapes and line names, the
@@ -80,7 +92,15 @@ npx wrangler deploy
 
 Wrangler prints the live URL - SPA and `/api/*` proxy on one origin.
 `npx wrangler tail` streams logs (watch for `X-Cache HIT/MISS/COALESCED`);
-`/healthz` returns remaining tokens, cache size and in-flight count.
+`/healthz` returns the running version, which upstreams are configured,
+remaining tokens, cache size and in-flight count - never the access id.
+A deploy is live a few seconds after wrangler prints the version id, so a
+`/healthz` run immediately afterwards can still answer from the outgoing
+isolate.
+
+`VBB_REST_BASE` and `VBB_REST_PRIMARY` in `wrangler.toml` decide which VBB
+source leads; both are explained in
+[`docs/vbb-api-access.md`](docs/vbb-api-access.md).
 Deploys are manual: a `git push` updates GitHub Pages, not the Worker.
 
 **GitHub Pages (testing only).** Pages is static hosting, so it cannot run the
@@ -88,10 +108,13 @@ Worker - but two things still work:
 
 - The **prototypes** are fully offline and run on Pages as-is:
   [mkoterski.github.io/sunside/prototypes](https://mkoterski.github.io/sunside/prototypes/)
-- The **app** detects a `github.io` host and falls back to calling VBB
-  directly: [mkoterski.github.io/sunside/public](https://mkoterski.github.io/sunside/public/). Fine for personal
-  testing; it spends the shared 100 req/min bucket the proxy exists to
-  protect, so anything beyond that goes through the Worker.
+- The **app** detects a `github.io` host and calls the deployed Worker
+  instead: [mkoterski.github.io/sunside/public](https://mkoterski.github.io/sunside/public/).
+  That origin is named explicitly in the Worker's CORS check rather than
+  allowed by a wildcard, which would make it an open proxy for VBB that any
+  site could spend our budget on. It cannot call VBB directly any more, and
+  since v0.19 it must not: the access id lives in the Worker, not in a page
+  anyone can view the source of.
 
 ## Why it is built like this
 
@@ -124,15 +147,14 @@ Worker - but two things still work:
 | | |
 |---|---|
 | Nearby departures | Geolocation (rounded to ~110 m so nearby users share cache keys) fans out to the 4 closest stops, merged into one live board with delays. One card per line and direction, so overlapping stops cannot crowd a line off the list; each card shows the walk to its boarding stop |
-| Transport filter | Chips above the board for S-Bahn / U-Bahn / Tram / Bus, multi-select, persisted. Counts come from the unfiltered board, so a chip says what picking it gives you. Filtering is client-side, so every combination shares one proxy cache key |
+| Transport filter | Chips above the board for S-Bahn / U-Bahn / Tram / Bus / Regional, multi-select, persisted. The row wraps rather than scrolling sideways, so no option sits off the edge of a phone unannounced. Counts come from the unfiltered board, so a chip says what picking it gives you. Filtering is client-side, so every combination shares one proxy cache key |
 | Refresh | Re-reads the GPS fix, not just the board. The location label prints the coordinates, accuracy and time of the fix, so a refresh is visibly a new one |
 | Demo mode | A fixed Hugenottenplatz location for trying the flow without granting geolocation |
 | Exit picker | The trip's real stopover list, boarding stop marked, each later stop tappable. Every stop, not the first eight: the list flows with the page rather than sitting in a 340px box whose scrollbar a phone never draws |
 | Sun-side verdict | Sit left / sit right / neutral, with the sun's azimuth and elevation, computed per segment and distance-weighted |
 | Route spine | Travel-order stop list on the result screen; the rail between stops is tinted by which side the sun strikes on that segment, with board/exit/flips flags and per-segment bearing + km |
 | Shade meter | Distance-weighted km bar in the verdict card: shade-left / even / shade-right, each share paired with its number |
-| Follow the ride (scroll cue) | The journey list has to stay a scroll container, since auto-follow drives it by `scrollTop`, so it says so instead: the bottom edge fades while there is more below and clears at the end |
-| Follow the ride | Journey view reached from the verdict: pinned status card (current segment, shade side, clock-estimate vs live-GPS source), the spine with current/passed states, a vertical progress bar, auto-follow with pause, and a replay once arrived. Clock/radar-driven, not a demo timer |
+| Follow the ride | Journey view reached from the verdict: pinned status card (current segment, shade side, clock-estimate vs live-GPS source), the spine with current/passed states, a vertical progress bar, auto-follow with pause, and a replay once arrived. Clock/radar-driven, not a demo timer. Its list stays a scroll container, since auto-follow drives it by `scrollTop`, so it says so: the bottom edge fades while there is more below and clears at the end |
 | Flip warning | When the shaded side genuinely changes mid-trip, the verdict says so instead of averaging it away |
 | Exit screen density | The journey summary and the vehicle position are one card, not two boxes with two borders and a gap. Measured at 430x932: 393px of chrome above the first stop became 286px, and stops readable without touching anything went from 7 to 13 |
 | Live radar | The actual vehicle's GPS position via VBB radar (Berlin + Brandenburg only). Position, not heading: HAFAS's radar call will not return a passlist, so the bearing comes from stop geometry - which is the better source on anything but a dead-straight single leg |
@@ -152,7 +174,9 @@ Follows the NeXtWind script standards (`nxw-script-standards.md` in the parent
 `claude-mk` working folder, not published here): development starts at `v0.10`,
 every iteration increments by one, every bump gets an entry, newest first,
 bug-fix entries name the root cause (NXW-VER-1 to NXW-VER-8). The version
-appears in the title above, the changelog below and the startup console banner.
+appears in the title above, the changelog below, the startup console banner,
+the app's own footer and the Worker's `/healthz` - the footer and the banner
+from one constant, so they cannot drift.
 History before v0.10 predates the numbering and is archived by date.
 
 ### Changelog
@@ -472,10 +496,21 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.25`, DEVELOPMENT. The full loop works end to end against live
-data: departures → exit stop → verdict with route spine and shade meter →
-follow-the-ride, with live radar, the best-departure finder, the transport
-filter and opt-in encrypted history, in German and English, deployed at the
-URL above. Verified end to end in one desktop browser at Schönhauser
-Allee/Bornholmer Str. (Berlin), Cottbus (Brandenburg), Rostock and Greifswald
-(Mecklenburg-Vorpommern). The v2A design handoff is fully implemented.
+Prototype, `v0.25`, DEVELOPMENT, deployed at the URL above. The full loop works
+end to end against live data: departures → exit stop → verdict with route spine
+and shade meter → follow-the-ride, with live radar, the best-departure finder,
+the transport filter and opt-in encrypted history, in German and English.
+
+Verified end to end in a desktop browser at Schönhauser Allee/Bornholmer Str.
+(Berlin), Cottbus (Brandenburg), Rostock and Greifswald
+(Mecklenburg-Vorpommern), and on an iPhone against the deployed Worker. The
+interface work since v0.21 was measured rather than eyeballed: contrast ratios
+per element with alpha composited against each element's real background, and
+layout at 390x932 and 430x932, both in Chromium.
+
+The v2A design handoff is fully implemented. Two things are known-open and
+deliberate, both waiting on VBB: the official ReST API stays second in the
+chain while its test system carries no realtime, and the radar still reports a
+position without a heading because `journeyPos`, the supported call that would
+fix it, returns nothing on that system. See
+[`docs/vbb-api-access.md`](docs/vbb-api-access.md).

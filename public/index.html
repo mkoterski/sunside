@@ -663,6 +663,40 @@ button:focus-visible,.dep-card:focus-visible,.stop-item:focus-visible{outline:2p
 <script src="history.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
 <script>
+/**
+ * SunSide Berlin - the app itself. Markup, CSS and behaviour in one file.
+ *
+ * No build step, no framework, no bundler: what is deployed is what is in the
+ * repository, and the only dependency is SunCalc for the sun's position. That
+ * is a deliberate ceiling on the project rather than an unfinished state - a
+ * rider needs one screen that loads on a platform with two bars of signal.
+ *
+ * Six screens, one at a time, swapped by show(): permission -> loading ->
+ * departures -> exit stop -> verdict, plus follow-the-ride hanging off the
+ * verdict. Only a few carry state worth naming: selDep, selTrip and selStops
+ * describe the ride being analysed, and legAnalysis is what the verdict and
+ * the journey screen both render from.
+ *
+ * Where the data comes from: never from a transit API directly. Every call
+ * goes to the Worker at /api, which speaks to VBB's official ReST API, VBB's
+ * mgate endpoint and Transitous, and normalises all three into one shape.
+ * Stop and trip ids arrive namespaced (`v~` / `h~` / `m~`) and are passed back
+ * untouched, which is what keeps follow-up calls on the provider that issued
+ * them. The SPA neither knows nor needs to know which one answered - except
+ * for the attribution line, which reads the X-Data-Source header.
+ *
+ * Two things the interface decides for itself, both from the sun rather than
+ * from a preference: which side of the vehicle is shaded, and which theme to
+ * wear. Sun mode is the high-contrast one for reading a phone in direct
+ * sunlight, and auto resolves to it from the sun's real elevation at the
+ * rider's position. Both are explained where they are implemented.
+ *
+ * What is stored, all in localStorage and all per-device: the language, the
+ * transport filter and the theme mode, under `sunside/`. The journey history
+ * keeps its own keys under `sunside.` and is encrypted with a passphrase this
+ * file never sees - see history.js and docs/encrypted-history.md.
+ */
+
 // ── Theme ──────────────────────────────────────────────
 // Four modes, cycled in this order: auto -> light -> dark -> sun -> auto.
 // Sun mode is the high-contrast one for direct sunlight; see the CSS block for
