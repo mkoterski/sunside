@@ -186,5 +186,39 @@ eq(pickPerLineDir([dep("U2", "Pankow", "2026-09-21T14:49:00+02:00", undefined),
                    dep("U2", "Pankow", "2026-09-21T14:50:00+02:00", 538)], 20)[0]._sDist, 538,
   "an unknown stop distance loses to a known one");
 
+// ── Auto theme: sun elevation -> interface mode (v0.22) ──────────────────────
+// Mirror of the rule in public/index.html. The clock is deliberately not an
+// input: 18:00 in June is full glare and 18:00 in December is night.
+function themeForElevation(el, current) {
+  if (el == null || !Number.isFinite(el)) return null;
+  if (el >= 12) return "sun";
+  if (el <= -6) return "dark";
+  if (el >= 9 && current === "sun") return "sun";
+  if (el <= -3 && current === "dark") return "dark";
+  return "light";
+}
+
+eq(themeForElevation(37, "light"), "sun", "a Berlin September noon is glare, whatever the clock says");
+eq(themeForElevation(12, "light"), "sun", "12 degrees is the threshold itself, not just past it");
+eq(themeForElevation(-40, "light"), "dark", "the middle of the night is dark mode");
+eq(themeForElevation(-6, "light"), "dark", "civil twilight ends and so does the light theme");
+eq(themeForElevation(3, "light"), "light", "a low sun is the ordinary theme, not the white-out one");
+
+// The band, which is the whole reason `current` is an argument. The sun
+// crosses these angles at roughly a fifth of a degree per minute, so a single
+// threshold would flip the entire interface back and forth for a quarter hour.
+eq(themeForElevation(10, "sun"), "sun", "having entered sun mode it holds down to 9");
+eq(themeForElevation(10, "light"), "light", "but 10 on the way up does not enter it yet");
+eq(themeForElevation(8.9, "sun"), "light", "below 9 it gives way, once");
+eq(themeForElevation(-4, "dark"), "dark", "dark holds until -3 on the way up");
+eq(themeForElevation(-4, "light"), "light", "and -4 on the way down does not trigger it early");
+eq(themeForElevation(-2.9, "dark"), "light", "above -3 the day starts");
+
+// No fix yet is not an elevation of zero: the caller falls back to the system
+// preference rather than pretending the rider is somewhere.
+eq(themeForElevation(null, "light"), null, "no position means no opinion");
+eq(themeForElevation(undefined, "light"), null, "and neither does an undefined one");
+eq(themeForElevation(NaN, "light"), null, "NaN is not a latitude's worth of information");
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

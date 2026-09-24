@@ -345,7 +345,14 @@ header{
 
 /* ── Stops list ── */
 .stops-label{font-size:var(--xs);font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:var(--sp3)}
-.stops-list{display:flex;flex-direction:column;gap:var(--sp1);max-height:340px;overflow-y:auto}
+/* No inner scroll box. It used to be capped at 340px, which is eight rows: a
+   ride with twenty stops showed eight and ended in a hard edge, and on a
+   phone nothing says a region scrolls - the scrollbar below only ever appears
+   mid-gesture on a desktop, and not at all on iOS. The list is the last thing
+   on this screen with nothing below it to keep in view, so it simply flows and
+   the PAGE scrolls, which is the gesture a rider already makes and the one
+   that rubber-bands to say "that is the end". */
+.stops-list{display:flex;flex-direction:column;gap:var(--sp1)}
 .stop-item{display:flex;align-items:center;gap:var(--sp3);padding:var(--sp3);
   border-radius:var(--r-md);cursor:pointer;border:1px solid transparent;
   transition:background var(--ease),border-color var(--ease)}
@@ -486,7 +493,10 @@ button:focus-visible,.dep-card:focus-visible,.stop-item:focus-visible{outline:2p
 .anim{animation:fade-up 260ms cubic-bezier(0.16,1,0.3,1) both}
 
 /* scrollbar thin */
-.stops-list{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+/* .j-list IS a scroll container and stays one: follow-the-ride drives it by
+   scrollTop, so it cannot hand its scrolling to the page the way the exit-stop
+   list now does. */
+.j-list{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
 </style>
 </head>
 <body>
@@ -618,15 +628,46 @@ button:focus-visible,.dep-card:focus-visible,.stop-item:focus-visible{outline:2p
 <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
 <script>
 // ── Theme ──────────────────────────────────────────────
-// Three modes, cycled in this order: light -> dark -> sun -> light. Sun mode
-// is the high-contrast one for direct sunlight; see the CSS block for what it
-// actually changes and why.
+// Four modes, cycled in this order: auto -> light -> dark -> sun -> auto.
+// Sun mode is the high-contrast one for direct sunlight; see the CSS block for
+// what it actually changes and why.
 //
-// The choice is persisted. It was not before, and for the other two that was
-// merely untidy: sun mode is chosen in the one situation where the app is
-// hardest to use, and losing it on the next load would mean squinting at the
-// header to set it again every single time.
-const THEMES=['light','dark','sun'];
+// AUTO is the default, and it follows the sun's ELEVATION rather than the
+// clock. The clock would be the obvious lever and it is the wrong one: 18:00
+// in June is full glare and 18:00 in December is night, and a fixed
+// "06:00-20:00 is daytime" would put the app in white-out mode during a
+// December evening commute and in low-contrast mode at 21:00 in July. The
+// elevation costs nothing to know - this app already computes it for the
+// rider's exact position every minute, to answer the question it exists for -
+// and it is the thing that actually predicts glare, since it sets how much
+// atmosphere the light crosses and how much of it lands on a screen held at
+// reading angle. Elevation is not perfect either: it cannot see cloud, a
+// tunnel or a station roof. It is, however, right about the case that matters
+// and wrong only in the direction of a screen that is merely emphatic.
+//
+// One tap pins a mode, and a pinned mode is never overridden - sun mode gets
+// chosen in the one situation where the app is hardest to use, so losing it on
+// the next load, or to a passing cloud's worth of arithmetic, would be its own
+// bug. The choice is persisted; before v0.21 nothing was.
+const THEMES=['auto','light','dark','sun'];
+
+// Elevation in degrees -> the mode auto resolves to. `current` is what is on
+// screen now, and it is what makes the thresholds a band rather than an edge:
+// the sun crosses 12 degrees at roughly a fifth of a degree per minute, so a
+// single threshold would flip the whole interface back and forth for a quarter
+// of an hour. Enter sun mode at 12, leave it at 9; enter dark at civil
+// twilight (-6), leave it at -3.
+//
+// Returns null when there is no fix yet, which is the caller's cue to fall
+// back to the system preference rather than to guess at a latitude.
+function themeForElevation(el,current){
+  if(el==null||!Number.isFinite(el))return null;
+  if(el>=12)return 'sun';
+  if(el<=-6)return 'dark';
+  if(el>=9&&current==='sun')return 'sun';
+  if(el<=-3&&current==='dark')return 'dark';
+  return 'light';
+}
 const setTheme=(function(){
   const btn=document.getElementById('theme-toggle');
   const html=document.documentElement;
@@ -634,20 +675,49 @@ const setTheme=(function(){
     // Each icon shows the mode the tap SWITCHES TO, matching what this button
     // has always done. The aria-label says so in words, since a glyph alone
     // cannot distinguish "sun mode" from "light mode".
+    auto:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 16l3-8 3 8M10 13.5h4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     dark:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
     sun:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/></svg>',
     light:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>',
   };
+  // Anything stored is a mode the rider pinned themselves; anything else,
+  // including a first visit, starts on auto.
   let cur=(function(){
     try{const s=localStorage.getItem('sunside/theme');if(THEMES.includes(s))return s}catch(e){}
-    // No stored choice: follow the system. A device set to "increase contrast"
-    // is telling us something this app has an answer for, so honour it.
-    try{if(matchMedia('(prefers-contrast:more)').matches)return 'sun'}catch(e){}
-    return matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
+    return 'auto';
   })();
+  let applied=null; // what is actually on screen, which auto needs to resolve
+
+  // What auto resolves to right now. The sun elevation is read live rather
+  // than from the sun bar, because the bar shows the ANALYSED departure's sun
+  // while a trip is open and the interface has to follow the rider's actual
+  // daylight, not the one they are reading about.
+  function resolveAuto(){
+    // A device set to "increase contrast" is asking for exactly what sun mode
+    // provides, and it outranks the arithmetic.
+    try{if(matchMedia('(prefers-contrast:more)').matches)return 'sun'}catch(e){}
+    let el=null;
+    // uLat and SunCalc both arrive later than this module: a position needs a
+    // fix and the library is a separate script. Until then there is no
+    // elevation to reason from, and reading them throws rather than answering
+    // undefined.
+    try{if(uLat!=null&&typeof SunCalc!=='undefined')el=sunInfo(uLat,uLon).el}catch(e){}
+    const byEl=themeForElevation(el,applied);
+    if(byEl)return byEl;
+    return matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
+  }
+
+  // No argument re-applies the current mode, which is what a re-label wants.
+  // Passing the RESOLVED theme back in would quietly pin auto to whatever it
+  // had resolved to - which is exactly what the language switch did until a
+  // browser check caught it.
   function apply(theme,persist){
-    cur=theme;
-    html.setAttribute('data-theme',cur);
+    cur=theme==null?cur:theme;
+    applied=cur==='auto'?resolveAuto():cur;
+    html.setAttribute('data-theme',applied);
+    // The MODE, not the result: what the button says, what a test reads, and
+    // what tells you at a glance whether the screen chose this or you did.
+    html.setAttribute('data-theme-mode',cur);
     if(persist){try{localStorage.setItem('sunside/theme',cur)}catch(e){}}
     const next=THEMES[(THEMES.indexOf(cur)+1)%THEMES.length];
     btn.innerHTML=ICON[next];
@@ -663,6 +733,12 @@ const setTheme=(function(){
   apply(cur,false);
   return apply;
 })();
+
+// Re-resolve auto: called after every sun reading, so the interface follows
+// the day at the same cadence the sun bar does. A no-op on a pinned mode.
+function refreshAutoTheme(){
+  if(document.documentElement.getAttribute('data-theme-mode')==='auto')setTheme('auto',false);
+}
 
 // ── Language (F1) ──────────────────────────────────────
 // German default - the riders are in Berlin. One dictionary per language,
@@ -734,6 +810,7 @@ de:{
   error:'Fehler', startOver:'← Von vorn',
   langAria:'Sprache wechseln', themeAria:'Design wechseln',
   themeTo:(m)=>`Umschalten auf ${m}`,
+  theme_auto:'automatisch - folgt dem Sonnenstand',
   theme_light:'helles Design', theme_dark:'dunkles Design',
   theme_sun:'Sonnenmodus - hoher Kontrast für direktes Sonnenlicht',
   histTitle:'Verlauf',
@@ -825,6 +902,7 @@ en:{
   error:'Error', startOver:'← Start over',
   langAria:'Switch language', themeAria:'Toggle theme',
   themeTo:(m)=>`Switch to ${m}`,
+  theme_auto:'automatic - follows the sun\'s elevation',
   theme_light:'light theme', theme_dark:'dark theme',
   theme_sun:'sun mode - high contrast for direct sunlight',
   histTitle:'History',
@@ -864,7 +942,7 @@ function applyLang(){
   const lbtn=document.getElementById('lang-toggle');
   lbtn.textContent=lang.toUpperCase();
   lbtn.setAttribute('aria-label',t('langAria'));
-  setTheme(document.documentElement.getAttribute('data-theme'),false); // re-labels the toggle
+  setTheme(null,false); // re-labels the toggle in the new language, mode intact
   renderHistCard();
   renderAttrib();
   const active=document.querySelector('.screen.active')?.id;
@@ -960,7 +1038,7 @@ const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
 // One constant for both places the build shows itself: the console banner and
 // the footer. Two hand-edited strings drift, and a footer that lies about the
 // build is worse than no footer.
-const APP_VERSION='0.21';
+const APP_VERSION='0.22';
 console.log(`SunSide Berlin v${APP_VERSION} - API base:`,API);
 
 // Project page rather than the repository: it is the page that explains what
@@ -1015,6 +1093,10 @@ function updateSunBar(lat,lon,when){
   document.getElementById('sb-el').textContent=el.toFixed(1)+'°';
   document.getElementById('sb-dir').textContent=down?'-':cardinalFromAz(az);
   document.getElementById('sb-time').textContent=at.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  // Every path that updates the sun bar has just learned something about the
+  // daylight - a first fix, a refreshed one, the minute ticking over - so this
+  // is the one place auto needs to reconsider.
+  refreshAutoTheme();
 }
 setInterval(()=>{if(uLat)updateSunBar(uLat,uLon,sunBarWhen)},60000);
 

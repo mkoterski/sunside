@@ -1,4 +1,4 @@
-# SunSide Berlin - v0.21
+# SunSide Berlin - v0.22
 
 **Status:** DEVELOPMENT
 **Versioning:** `v0.x` = development/testing, `v1.x` = production-ready
@@ -127,7 +127,7 @@ Worker - but two things still work:
 | Transport filter | Chips above the board for S-Bahn / U-Bahn / Tram / Bus, multi-select, persisted. Counts come from the unfiltered board, so a chip says what picking it gives you. Filtering is client-side, so every combination shares one proxy cache key |
 | Refresh | Re-reads the GPS fix, not just the board. The location label prints the coordinates, accuracy and time of the fix, so a refresh is visibly a new one |
 | Demo mode | A fixed Hugenottenplatz location for trying the flow without granting geolocation |
-| Exit picker | The trip's real stopover list, boarding stop marked, each later stop tappable |
+| Exit picker | The trip's real stopover list, boarding stop marked, each later stop tappable. Every stop, not the first eight: the list flows with the page rather than sitting in a 340px box whose scrollbar a phone never draws |
 | Sun-side verdict | Sit left / sit right / neutral, with the sun's azimuth and elevation, computed per segment and distance-weighted |
 | Route spine | Travel-order stop list on the result screen; the rail between stops is tinted by which side the sun strikes on that segment, with board/exit/flips flags and per-segment bearing + km |
 | Shade meter | Distance-weighted km bar in the verdict card: shade-left / even / shade-right, each share paired with its number |
@@ -138,7 +138,7 @@ Worker - but two things still work:
 | Coverage beyond Berlin | Mecklenburg-Vorpommern and the rest of Germany via Transitous, picked automatically from where you are, with a visible attribution line when it serves |
 | Regional rail | Included since v0.18 - outside Berlin it is often the only service on a route, and a 40-minute regional ride is where the sun side matters most |
 | Best-departure finder | Ranks the next departures of the same line by sun exposure - and says honestly when they barely differ |
-| Theme | Light / dark / sun, cycled from the header and remembered. **Sun mode** is the one for standing in direct sunlight: white ground, black text, no mid greys, solid borders instead of glare-eaten hairlines, no shadows, and a step up in size and weight. Every element measured at 7:1 or better against its real background, against 4.5:1 in the other two. A device set to "increase contrast" starts there |
+| Theme | Auto / light / dark / sun, cycled from the header and remembered. **Auto** is the default and follows the sun's real elevation at the rider's position, which the app already computes every minute: sun mode above 12°, dark below civil twilight, light in between, with a hysteresis band so it cannot flap at the threshold. Not the clock - 18:00 in June is full glare and 18:00 in December is night. One tap pins a mode and a pinned mode is never overridden. **Sun mode** is the one for standing in direct sunlight: white ground, black text, no mid greys, solid borders instead of glare-eaten hairlines, no shadows, and a step up in size and weight. Every element measured at 7:1 or better against its real background, against 4.5:1 in the other two. A device set to "increase contrast" starts there |
 | Footer | The build number on every screen, linking to the project page. One constant feeds it and the console banner, so the two cannot drift |
 | Language | DE/EN toggle in the header, German default, persisted in `localStorage`. Static markup re-applies via `data-i18n`; the active screen re-renders, so nothing on screen stays behind |
 | History | Opt-in, passphrase-gated, encrypted journey history - device-only, zero-knowledge at rest (AES-GCM, PBKDF2). Each verdict saves the ride; matching departures and the remembered exit stop get a "recent" tag. Lock and clear controls on the card; forgotten passphrase = gone, by design. See [`docs/encrypted-history.md`](docs/encrypted-history.md) |
@@ -156,6 +156,34 @@ History before v0.10 predates the numbering and is archived by date.
 ### Changelog
 
 ```
+v0.22  2026-09-24  Added: the theme follows the sun by default. Auto is a
+                   fourth mode and the new default, resolved from the sun's
+                   ELEVATION at the rider's position - which this app already
+                   computes every minute for the question it exists to answer
+                   - rather than from the clock, which gets exactly the cases
+                   wrong that matter: 18:00 in June is full glare, 18:00 in
+                   December is night. Sun mode above 12 degrees, dark below
+                   civil twilight, light in between, with a 3-degree
+                   hysteresis band because the sun crosses those angles at a
+                   fifth of a degree per minute and a bare threshold would
+                   flip the interface back and forth for a quarter of an
+                   hour. One tap still pins a mode, and a pinned mode is never
+                   overridden. Verified against the live clock in Chromium:
+                   Berlin at 37 degrees resolves to sun, 21 June at 20:30
+                   (7 degrees) to light where a clock rule would say night,
+                   and 21 December at 17:30 (-13 degrees) to dark where a
+                   clock rule would say day.
+                   Fixed: the exit-stop list stopped at eight. It was capped
+                   at max-height:340px with a scrollbar that appears only
+                   mid-gesture on a desktop and never on iOS, so a 34-stop
+                   ride showed 8 and ended in a hard edge. The list is the
+                   last thing on that screen, so it now flows and the page
+                   scrolls.
+                   Fixed: the language switch quietly pinned the theme, by
+                   handing the resolved theme back to the setter as though it
+                   were the mode. Found by checking the behaviour in a
+                   browser rather than by reading the diff.
+
 v0.21  2026-09-24  Readability in direct sunlight, which is where this app is
                    used. New sun mode, third in the header toggle and
                    remembered across loads - the previous two were not
@@ -401,7 +429,7 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.21`, DEVELOPMENT. The full loop works end to end against live
+Prototype, `v0.22`, DEVELOPMENT. The full loop works end to end against live
 data: departures → exit stop → verdict with route spine and shade meter →
 follow-the-ride, with live radar, the best-departure finder, the transport
 filter and opt-in encrypted history, in German and English, deployed at the
