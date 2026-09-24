@@ -1,4 +1,4 @@
-# SunSide Berlin - v0.23
+# SunSide Berlin - v0.24
 
 **Status:** DEVELOPMENT
 **Versioning:** `v0.x` = development/testing, `v1.x` = production-ready
@@ -134,6 +134,7 @@ Worker - but two things still work:
 | Follow the ride (scroll cue) | The journey list has to stay a scroll container, since auto-follow drives it by `scrollTop`, so it says so instead: the bottom edge fades while there is more below and clears at the end |
 | Follow the ride | Journey view reached from the verdict: pinned status card (current segment, shade side, clock-estimate vs live-GPS source), the spine with current/passed states, a vertical progress bar, auto-follow with pause, and a replay once arrived. Clock/radar-driven, not a demo timer |
 | Flip warning | When the shaded side genuinely changes mid-trip, the verdict says so instead of averaging it away |
+| Exit screen density | The journey summary and the vehicle position are one card, not two boxes with two borders and a gap. Measured at 430x932: 393px of chrome above the first stop became 286px, and stops readable without touching anything went from 7 to 13 |
 | Live radar | The actual vehicle's GPS position via VBB radar (Berlin + Brandenburg only). Position, not heading: HAFAS's radar call will not return a passlist, so the bearing comes from stop geometry - which is the better source on anything but a dead-straight single leg |
 | Official data path | VBB's own ReST API under an issued access id since v0.19, as the fallback inside Berlin/Brandenburg and one env var away from leading. It stays second for now because the test system serves timetable data only - no prognoses, no vehicle positions - and live delays are worth more to a rider than provenance. Boards fall back between the two with the stop id unchanged, since both name a stop by its station number |
 | Coverage beyond Berlin | Mecklenburg-Vorpommern and the rest of Germany via Transitous, picked automatically from where you are, with a visible attribution line when it serves |
@@ -157,6 +158,22 @@ History before v0.10 predates the numbering and is archived by date.
 ### Changelog
 
 ```
+v0.24  2026-09-24  The rest of the exit screen's real estate. The journey
+                   summary and the vehicle position were two bordered boxes
+                   with a gap between them, and together with a dead margin
+                   inside the card, a 52px badge and doubled-up padding they
+                   spent 393px of a 932px phone before the list the screen
+                   exists for - 42% of the screen. They are one card now: the
+                   vehicle line sits under a hairline inside the summary, on
+                   one line rather than two, since the LIVE badge already said
+                   what the sun-tinted panel around it was saying a second
+                   time. Measured at 430x932: 393px of chrome became 286px,
+                   and stops readable without touching anything went from 7
+                   (v0.20, capped list) to 13. The line wraps rather than
+                   truncates, because in sun mode at 390px the German is one
+                   word too long and half a sentence with an ellipsis is
+                   worse than two lines.
+
 v0.23  2026-09-24  The other half of the hidden-scroll complaint. The exit
                    list was fixed in v0.22 by letting the page scroll; the
                    follow-the-ride list cannot be, because auto-follow drives
@@ -447,7 +464,7 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.23`, DEVELOPMENT. The full loop works end to end against live
+Prototype, `v0.24`, DEVELOPMENT. The full loop works end to end against live
 data: departures → exit stop → verdict with route spine and shade meter →
 follow-the-ride, with live radar, the best-departure finder, the transport
 filter and opt-in encrypted history, in German and English, deployed at the

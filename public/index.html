@@ -318,33 +318,50 @@ header{
 .skel-card{height:74px;border-radius:var(--r-lg);margin-bottom:var(--sp2)}
 
 /* ── Back btn ── */
+/* The padding stays: it is what makes the 44px touch target. Only the margin
+   below it goes, because the card underneath already carries its own. */
 .back-btn{display:flex;align-items:center;gap:var(--sp2);font-size:var(--sm);font-weight:700;
-  color:var(--accent);padding:var(--sp3) 0;margin-bottom:var(--sp2)}
+  color:var(--accent);padding:var(--sp3) 0;min-height:44px}
 .back-btn:hover{color:var(--accent-h)}
 
 /* ── Journey summary card ── */
+/* This card and the vehicle strip below it used to be two boxes with two
+   borders, two paddings and a gap between them, and together with the eyebrow
+   they pushed the first stop 393px down a 932px screen - 42% of the phone
+   spent before the list the screen exists for. They are one card now, and the
+   parts are sized for a phone rather than for a desktop mock. */
 .journey-card{
   background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);
-  padding:var(--sp5);margin-bottom:var(--sp4);box-shadow:var(--sh-sm);
+  padding:var(--sp4);margin-bottom:var(--sp3);box-shadow:var(--sh-sm);
 }
-.jc-top{display:flex;align-items:flex-start;gap:var(--sp3);margin-bottom:var(--sp3)}
-.jc-badge{min-width:52px;height:52px;border-radius:var(--r-lg);display:flex;align-items:center;justify-content:center;font-size:var(--sm);font-weight:900;color:#fff;flex-shrink:0}
+/* Zero, not sp3: the margin was inherited from a layout where something
+   followed jc-top inside the card, and for a while nothing did. The vehicle
+   row below brings its own spacing. */
+.jc-top{display:flex;align-items:flex-start;gap:var(--sp3);margin-bottom:0}
+.jc-badge{min-width:46px;height:46px;border-radius:var(--r-lg);display:flex;align-items:center;justify-content:center;font-size:var(--sm);font-weight:900;color:#fff;flex-shrink:0}
 .jc-meta h3{font-size:var(--base);font-weight:800}
 .jc-meta p{font-size:var(--xs);color:var(--muted);margin-top:3px}
 
-/* ── Vehicle position strip ── */
-.veh-strip{
-  background:var(--sun-bg);border:1px solid var(--sun-border);
-  border-radius:var(--r-md);padding:var(--sp3) var(--sp4);
-  display:flex;align-items:center;gap:var(--sp3);
-  font-size:var(--xs);color:var(--muted);
-}
-.veh-icon{font-size:18px;flex-shrink:0}
+/* ── Vehicle position row (inside the journey card) ── */
+/* A hairline instead of a second bordered box, and one line instead of two.
+   The LIVE badge is what marked this as live data; the sun-tinted panel it
+   used to sit in was saying the same thing a second time, for 100px. */
+#veh-strip-wrap:not(:empty){margin-top:var(--sp3);padding-top:var(--sp3);
+  border-top:1px solid var(--divider)}
+.veh-strip{display:flex;align-items:center;gap:var(--sp2);
+  font-size:var(--xs);color:var(--muted);min-width:0}
+.veh-icon{font-size:16px;flex-shrink:0}
+/* Wraps rather than truncates: in sun mode at 390px the German line is one
+   word too long, and half a sentence with an ellipsis is worse than two lines.
+   It grows only where it has to. */
+.veh-text{flex:1;min-width:0}
 .veh-text strong{color:var(--text);font-weight:700}
-.veh-ago{color:var(--faint);font-size:10px;margin-top:2px}
 
 /* ── Stops list ── */
-.stops-label{font-size:var(--xs);font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:var(--sp3)}
+/* The Back button's own padding is generous enough to open the screen; the
+   section's top padding on top of it was a second gap doing the same job. */
+#scr-stops .section{padding-top:var(--sp3)}
+.stops-label{font-size:var(--xs);font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:var(--sp2)}
 /* No inner scroll box. It used to be capped at 340px, which is eight rows: a
    ride with twenty stops showed eight and ended in a hard edge, and on a
    phone nothing says a region scrolls - the scrollbar below only ever appears
@@ -599,7 +616,6 @@ button:focus-visible,.dep-card:focus-visible,.stop-item:focus-visible{outline:2p
   <div class="section">
     <button class="back-btn" onclick="show('scr-deps')" data-i18n="back">← Back</button>
     <div class="journey-card anim" id="jc-card"></div>
-    <div id="veh-strip-wrap"></div>
     <div class="stops-label" data-i18n="whereOff">Where do you get off?</div>
     <div class="stops-list" id="stops-list"></div>
   </div>
@@ -789,7 +805,7 @@ de:{
   now:'jetzt',
   prodTrain:'Zug',
   departs:(t,s)=>`Abfahrt ${t} ab ${s}`,
-  vehicleLocated:d=>`<strong>Fahrzeug geortet</strong> - ${d} entfernt`,
+  vehNear:d=>`<strong>Fahrzeug ${d}</strong> entfernt`, vehSrc:'Live-GPS',
   liveGps:'Live-GPS-Position via VBB-Radar',
   boardingHere:'(Einstieg)',
   sideWord:{left:'linke',right:'rechte'},
@@ -881,7 +897,7 @@ en:{
   now:'now',
   prodTrain:'Train',
   departs:(t,s)=>`departs ${t} from ${s}`,
-  vehicleLocated:d=>`<strong>Vehicle located</strong> - ${d} away`,
+  vehNear:d=>`<strong>Vehicle ${d}</strong> away`, vehSrc:'live GPS',
   liveGps:'Live GPS position via VBB radar',
   boardingHere:'(boarding here)',
   sideWord:{left:'left',right:'right'},
@@ -1048,7 +1064,7 @@ const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
 // One constant for both places the build shows itself: the console banner and
 // the footer. Two hand-edited strings drift, and a footer that lies about the
 // build is worse than no footer.
-const APP_VERSION='0.23';
+const APP_VERSION='0.24';
 console.log(`SunSide Berlin v${APP_VERSION} - API base:`,API);
 
 // Project page rather than the repository: it is the page that explains what
@@ -1381,7 +1397,8 @@ function renderJourneyCard(){
         <h3>${esc(selDep.direction||'?')}</h3>
         <p>${prodLabel} · ${t('departs')(timeStr,esc(selDep._sName))}</p>
       </div>
-    </div>`;
+    </div>
+    <div id="veh-strip-wrap"></div>`;
 }
 
 async function fetchTrip(tripId){
@@ -1444,12 +1461,9 @@ function renderVehicleStrip(veh){
   const prodIcon=selDep.line?.product==='bus'?'🚌':selDep.line?.product==='tram'?'🚋':selDep.line?.product==='suburban'?'🚆':'🚇';
 
   wrap.innerHTML=`
-    <div class="veh-strip" style="margin-bottom:var(--sp4)">
+    <div class="veh-strip">
       <div class="veh-icon">${prodIcon}</div>
-      <div class="veh-text">
-        <div>${t('vehicleLocated')(distStr)}</div>
-        <div class="veh-ago">${t('liveGps')}</div>
-      </div>
+      <div class="veh-text" title="${t('liveGps')}">${t('vehNear')(distStr)} · ${t('vehSrc')}</div>
       <div class="live-badge"><div class="live-dot"></div>LIVE</div>
     </div>`;
 }
