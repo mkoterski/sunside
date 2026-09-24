@@ -20,7 +20,7 @@
   --left:#1a6fbf;--left-bg:#e8f0fb;--left-border:oklch(from #1a6fbf l c h / 0.3);
   --right:#c0392b;--right-bg:#fdecea;--right-border:oklch(from #c0392b l c h / 0.3);
   --sbahn:#068e2a;--ubahn:#005daa;--tram:#cc0000;--bus:#8b008b;--regional:#7a4e2d;
-  --ok:#2d7a3a;
+  --ok:#1f6b2e;--delay:#b3301f;
   --rail-neutral:#d9d5ca;
   --progress-track:#e3dfd6;--status-bg:#1c1a15;
   --sh-sm:0 1px 3px oklch(0.2 0.01 80/0.07);
@@ -38,9 +38,12 @@
   --sp6:1.5rem;--sp8:2rem;--sp10:2.5rem;--sp12:3rem;
 }
 [data-theme="dark"]{
+  --ok:#4fbe66;--delay:#ff9080;
   --bg:#131109;--surface:#1b1916;--surface2:#22201c;--offset:#2a271f;
   --border:oklch(0.9 0 0/0.08);--divider:oklch(0.9 0 0/0.05);
-  --text:#d5d1c5;--muted:#888478;--faint:#56534b;--inv:#1b1916;
+  /* --muted lifted from #888478: on the chip ground it measured 3.99:1, under
+     the floor for the size it is used at. --faint follows it up. */
+  --text:#d5d1c5;--muted:#9c988a;--faint:#6b675d;--inv:#1b1916;
   --accent:#ff7c33;--accent-h:#ff9955;--accent-bg:#2c1808;
   --sun:#ffc040;--sun-bg:#281c06;--sun-border:oklch(from #ffc040 l c h / 0.25);
   --left:#5599e8;--left-bg:#0c1d35;--left-border:oklch(from #5599e8 l c h / 0.3);
@@ -50,10 +53,77 @@
   --progress-track:#2a271f;--status-bg:#0f1218;
   --sh-sm:0 1px 3px oklch(0 0 0/0.3);--sh-md:0 4px 16px oklch(0 0 0/0.4);--sh-lg:0 12px 40px oklch(0 0 0/0.5);
 }
+/* Sun mode: for reading the screen in direct sunlight, which is exactly where
+   a rider stands when they open this app. Glare adds a constant sheet of
+   reflected light to every pixel, and that flattens ratios: the darker the
+   screen, the more of what you see is reflection rather than screen, which is
+   why dark mode is the worst of the three outdoors. So this mode maximises
+   luminance difference instead of looking tasteful - white ground, black text,
+   no mid greys, no hairline borders that glare eats, no shadows pretending to
+   be edges, and a step up in size and weight because thin strokes are the
+   first thing to disappear. Colours are darkened to stay legible as text on
+   white; the line badges keep their transit identity because a rider matches
+   those by hue, not by reading them. */
+[data-theme="sun"]{
+  --bg:#ffffff;--surface:#ffffff;--surface2:#ffffff;--offset:#e6e4df;
+  --border:#1a1a1a;--divider:#6e6b63;
+  --text:#000000;--muted:#2b2924;--faint:#454239;--inv:#ffffff;
+  --accent:#9c3400;--accent-h:#7d2900;--accent-bg:#ffe7d9;
+  --sun:#6f4200;--sun-bg:#fff2d0;--sun-border:#6f4200;
+  --left:#00408f;--left-bg:#d9e6ff;--left-border:#00408f;
+  --right:#a10f00;--right-bg:#ffe0dc;--right-border:#a10f00;
+  --sbahn:#00631e;--ubahn:#00408f;--tram:#a10000;--bus:#6b006b;--regional:#53301a;
+  --ok:#00631e;--delay:#8c0f00;
+  --rail-neutral:#7e7a6e;
+  --progress-track:#cfccc3;--status-bg:#000000;
+  /* Shadows read as smudges under glare, and they were doing the work of
+     separating cards. Borders take that job over, below. */
+  --sh-sm:none;--sh-md:none;--sh-lg:none;
+  /* One step up the scale. Sunlight scatters in the eye and thin small type
+     is what goes first. */
+  --xs:clamp(0.8125rem,0.78rem + 0.2vw,0.9375rem);
+  --sm:clamp(0.9375rem,0.88rem + 0.3vw,1.0625rem);
+  --base:clamp(1.0625rem,1rem + 0.25vw,1.1875rem);
+  --lg:clamp(1.2rem,1.1rem + 0.5vw,1.45rem);
+  --xl:clamp(1.45rem,1.2rem + 1vw,1.9rem);
+}
+/* Structure, not just colour: edges that survive glare, and weight that keeps
+   its shape when the eye is squinting. */
+[data-theme="sun"] body{font-weight:500}
+[data-theme="sun"] header{box-shadow:none;border-bottom:2px solid var(--border)}
+[data-theme="sun"] .icon-btn{color:var(--text);border:2px solid var(--border)}
+[data-theme="sun"] #sun-bar{border-bottom:2px solid var(--sun-border);
+  color:var(--text);font-weight:600}
+[data-theme="sun"] .dep-card{border-width:2px}
+[data-theme="sun"] .dep-dest{font-weight:800}
+[data-theme="sun"] .dep-stop{color:var(--muted);font-weight:600}
+[data-theme="sun"] .dep-stop .ds-walk{color:var(--muted)}
+[data-theme="sun"] .line-badge{font-weight:900;border:2px solid oklch(0 0 0/0.35)}
+[data-theme="sun"] .chip{border:2px solid var(--border);color:var(--text);font-weight:800}
+[data-theme="sun"] .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+[data-theme="sun"] .chip[disabled]{opacity:.62}
+/* 10px type on a 15%-alpha tint is the smallest, palest thing on the board.
+   Solid ground and white text, one size up, so LIVE stays a badge and not a
+   smudge. */
+[data-theme="sun"] .live-badge{background:var(--ok);color:#fff;font-size:11px;
+  padding:2px 7px}
+[data-theme="sun"] .live-dot{background:#fff}
+[data-theme="sun"] .delay-tag{font-weight:800}
+[data-theme="sun"] .chip .cnum{opacity:1}
+[data-theme="sun"] .attrib,[data-theme="sun"] .appver,
+[data-theme="sun"] .appver a{color:var(--muted)}
+/* Uppercase eyebrows are tracked out for elegance at small sizes; one size up
+   that tracking is what pushes "ABFAHRTEN IN DER NAEHE" onto a second line.
+   Darker ink is already doing the work the tracking was there for. */
+[data-theme="sun"] .sec-title,[data-theme="sun"] .hist-title,
+[data-theme="sun"] .stops-label,[data-theme="sun"] .finder-hdr{
+  letter-spacing:.02em;color:var(--text);font-weight:800}
+
 @media(prefers-color-scheme:dark){:root:not([data-theme]){
+  --ok:#4fbe66;--delay:#ff9080;
   --bg:#131109;--surface:#1b1916;--surface2:#22201c;--offset:#2a271f;
   --border:oklch(0.9 0 0/0.08);--divider:oklch(0.9 0 0/0.05);
-  --text:#d5d1c5;--muted:#888478;--faint:#56534b;--inv:#1b1916;
+  --text:#d5d1c5;--muted:#9c988a;--faint:#6b675d;--inv:#1b1916;
   --accent:#ff7c33;--accent-h:#ff9955;--accent-bg:#2c1808;
   --sun:#ffc040;--sun-bg:#281c06;--left:#5599e8;--left-bg:#0c1d35;
   --right:#e86060;--right-bg:#2d0e0e;
@@ -173,7 +243,10 @@ header{
 /* The stop name truncates; the walk distance does not - it is the newer and
    more decision-relevant half, and it is short. */
 .dep-stop .ds-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.dep-stop .ds-walk{flex-shrink:0;color:var(--faint);font-variant-numeric:tabular-nums}
+/* --muted, not --faint: at #b5b2a4 on #faf9f7 the walk read at about 1.9:1,
+   which is under the 4.5:1 floor before a single ray of sun hits the screen.
+   It is also the half of this line a rider actually decides on. */
+.dep-stop .ds-walk{flex-shrink:0;color:var(--muted);font-variant-numeric:tabular-nums}
 
 /* ── Data-source attribution (F6) ── */
 /* Transitous asks for a visible link to their sources page wherever their
@@ -191,8 +264,10 @@ header{
    board looked wrong" is only useful with a build number attached, and one
    that lives in the console banner alone is one nobody reads on a phone. */
 .appver{padding:var(--sp2) var(--sp5) var(--sp5);text-align:center;
-  font-size:var(--xs);color:var(--faint)}
-.appver a{color:var(--faint);text-decoration:none}
+  font-size:var(--xs);color:var(--muted)}
+/* --muted rather than --faint: measured at 1.9:1 against the light theme's
+   background, which is a decoration, not a line of text. */
+.appver a{color:var(--muted);text-decoration:none}
 .appver a:hover,.appver a:focus-visible{color:var(--accent);
   text-decoration:underline;text-underline-offset:2px}
 
@@ -209,7 +284,10 @@ header{
   background:var(--offset);color:var(--muted);border:1px solid transparent;
   font-size:var(--xs);font-weight:700;white-space:nowrap}
 .chip:hover{color:var(--text)}
-.chip.on{background:var(--accent-bg);color:var(--accent);border-color:oklch(from var(--accent) l c h/.35)}
+/* --accent-h, the hover shade, is simply the darker one: the accent on its own
+   tint measured 3.47:1, under the floor, on the single chip whose state has to
+   be unmistakable. */
+.chip.on{background:var(--accent-bg);color:var(--accent-h);border-color:oklch(from var(--accent) l c h/.45)}
 .chip[disabled]{opacity:.35;cursor:default;pointer-events:none}
 .chip .cdot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
 .chip .cnum{font-variant-numeric:tabular-nums;opacity:.75}
@@ -217,8 +295,8 @@ header{
 /* ── Live indicator ── */
 .live-badge{
   display:inline-flex;align-items:center;gap:3px;
-  background:oklch(from var(--ok) l c h/.15);color:var(--ok);
-  border-radius:var(--r-full);padding:1px 6px;font-size:10px;font-weight:700;
+  background:oklch(from var(--ok) l c h/.12);color:var(--ok);
+  border-radius:var(--r-full);padding:2px 7px;font-size:11px;font-weight:700;
   margin-top:3px;
 }
 .live-dot{width:5px;height:5px;border-radius:50%;background:var(--ok);
@@ -228,8 +306,10 @@ header{
 .dep-time-block{text-align:right;flex-shrink:0}
 .dep-mins{font-size:var(--lg);font-weight:900;font-variant-numeric:tabular-nums;color:var(--accent);line-height:1}
 .dep-mins.now-cls{color:var(--ok)}
-.dep-abs{font-size:var(--xs);color:var(--faint);font-variant-numeric:tabular-nums}
-.delay-tag{font-size:10px;color:#c0392b;font-weight:700}
+/* The clock time under the countdown: --faint put it at 2.0:1 in the light
+   theme, and it is the number a rider checks against the platform display. */
+.dep-abs{font-size:var(--xs);color:var(--muted);font-variant-numeric:tabular-nums}
+.delay-tag{font-size:11px;color:var(--delay);font-weight:700}
 
 /* ── Skeleton ── */
 @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
@@ -538,16 +618,50 @@ button:focus-visible,.dep-card:focus-visible,.stop-item:focus-visible{outline:2p
 <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
 <script>
 // ── Theme ──────────────────────────────────────────────
-(function(){
+// Three modes, cycled in this order: light -> dark -> sun -> light. Sun mode
+// is the high-contrast one for direct sunlight; see the CSS block for what it
+// actually changes and why.
+//
+// The choice is persisted. It was not before, and for the other two that was
+// merely untidy: sun mode is chosen in the one situation where the app is
+// hardest to use, and losing it on the next load would mean squinting at the
+// header to set it again every single time.
+const THEMES=['light','dark','sun'];
+const setTheme=(function(){
   const btn=document.getElementById('theme-toggle');
   const html=document.documentElement;
-  let d=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
-  html.setAttribute('data-theme',d);
-  setIcon(d);
-  btn.addEventListener('click',()=>{d=d==='dark'?'light':'dark';html.setAttribute('data-theme',d);setIcon(d)});
-  function setIcon(t){btn.innerHTML=t==='dark'
-    ?'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>'
-    :'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>'}
+  const ICON={
+    // Each icon shows the mode the tap SWITCHES TO, matching what this button
+    // has always done. The aria-label says so in words, since a glyph alone
+    // cannot distinguish "sun mode" from "light mode".
+    dark:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
+    sun:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/></svg>',
+    light:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>',
+  };
+  let cur=(function(){
+    try{const s=localStorage.getItem('sunside/theme');if(THEMES.includes(s))return s}catch(e){}
+    // No stored choice: follow the system. A device set to "increase contrast"
+    // is telling us something this app has an answer for, so honour it.
+    try{if(matchMedia('(prefers-contrast:more)').matches)return 'sun'}catch(e){}
+    return matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
+  })();
+  function apply(theme,persist){
+    cur=theme;
+    html.setAttribute('data-theme',cur);
+    if(persist){try{localStorage.setItem('sunside/theme',cur)}catch(e){}}
+    const next=THEMES[(THEMES.indexOf(cur)+1)%THEMES.length];
+    btn.innerHTML=ICON[next];
+    // The string table is declared further down this script, so the very first
+    // call lands before it exists and the label is left to applyLang(), which
+    // runs on load and sets it. Reading it early throws rather than returning
+    // undefined (const in its temporal dead zone), and an uncaught throw here
+    // would abort the rest of the script - hence the catch rather than a
+    // typeof check, which a hoisted function declaration passes happily.
+    try{btn.setAttribute('aria-label',t('themeTo')(t('theme_'+next)))}catch(e){}
+  }
+  btn.addEventListener('click',()=>apply(THEMES[(THEMES.indexOf(cur)+1)%THEMES.length],true));
+  apply(cur,false);
+  return apply;
 })();
 
 // ── Language (F1) ──────────────────────────────────────
@@ -619,6 +733,9 @@ de:{
   pctSun:'% Sonne', shadiest:'schattigste',
   error:'Fehler', startOver:'← Von vorn',
   langAria:'Sprache wechseln', themeAria:'Design wechseln',
+  themeTo:(m)=>`Umschalten auf ${m}`,
+  theme_light:'helles Design', theme_dark:'dunkles Design',
+  theme_sun:'Sonnenmodus - hoher Kontrast für direktes Sonnenlicht',
   histTitle:'Verlauf',
   histIntro:'Merkt sich deine letzten Fahrten - nur auf diesem Gerät, verschlüsselt mit einer Passphrase deiner Wahl. Ohne Passphrase nicht lesbar, auch nicht von der App.',
   histWarnNoReset:'Passphrase vergessen = Verlauf unwiederbringlich weg. Es gibt keinen Reset.',
@@ -707,6 +824,9 @@ en:{
   pctSun:'% sun', shadiest:'shadiest',
   error:'Error', startOver:'← Start over',
   langAria:'Switch language', themeAria:'Toggle theme',
+  themeTo:(m)=>`Switch to ${m}`,
+  theme_light:'light theme', theme_dark:'dark theme',
+  theme_sun:'sun mode - high contrast for direct sunlight',
   histTitle:'History',
   histIntro:'Remembers your recent rides - on this device only, encrypted with a passphrase you choose. Unreadable without it, even by the app.',
   histWarnNoReset:'Forgotten passphrase = history is gone for good. There is no reset.',
@@ -744,7 +864,7 @@ function applyLang(){
   const lbtn=document.getElementById('lang-toggle');
   lbtn.textContent=lang.toUpperCase();
   lbtn.setAttribute('aria-label',t('langAria'));
-  document.getElementById('theme-toggle').setAttribute('aria-label',t('themeAria'));
+  setTheme(document.documentElement.getAttribute('data-theme'),false); // re-labels the toggle
   renderHistCard();
   renderAttrib();
   const active=document.querySelector('.screen.active')?.id;
@@ -840,7 +960,7 @@ const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
 // One constant for both places the build shows itself: the console banner and
 // the footer. Two hand-edited strings drift, and a footer that lies about the
 // build is worse than no footer.
-const APP_VERSION='0.20';
+const APP_VERSION='0.21';
 console.log(`SunSide Berlin v${APP_VERSION} - API base:`,API);
 
 // Project page rather than the repository: it is the page that explains what

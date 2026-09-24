@@ -1,4 +1,4 @@
-# SunSide Berlin - v0.20
+# SunSide Berlin - v0.21
 
 **Status:** DEVELOPMENT
 **Versioning:** `v0.x` = development/testing, `v1.x` = production-ready
@@ -138,7 +138,7 @@ Worker - but two things still work:
 | Coverage beyond Berlin | Mecklenburg-Vorpommern and the rest of Germany via Transitous, picked automatically from where you are, with a visible attribution line when it serves |
 | Regional rail | Included since v0.18 - outside Berlin it is often the only service on a route, and a 40-minute regional ride is where the sun side matters most |
 | Best-departure finder | Ranks the next departures of the same line by sun exposure - and says honestly when they barely differ |
-| Theme | Light/dark toggle |
+| Theme | Light / dark / sun, cycled from the header and remembered. **Sun mode** is the one for standing in direct sunlight: white ground, black text, no mid greys, solid borders instead of glare-eaten hairlines, no shadows, and a step up in size and weight. Every element measured at 7:1 or better against its real background, against 4.5:1 in the other two. A device set to "increase contrast" starts there |
 | Footer | The build number on every screen, linking to the project page. One constant feeds it and the console banner, so the two cannot drift |
 | Language | DE/EN toggle in the header, German default, persisted in `localStorage`. Static markup re-applies via `data-i18n`; the active screen re-renders, so nothing on screen stays behind |
 | History | Opt-in, passphrase-gated, encrypted journey history - device-only, zero-knowledge at rest (AES-GCM, PBKDF2). Each verdict saves the ride; matching departures and the remembered exit stop get a "recent" tag. Lock and clear controls on the card; forgotten passphrase = gone, by design. See [`docs/encrypted-history.md`](docs/encrypted-history.md) |
@@ -156,6 +156,28 @@ History before v0.10 predates the numbering and is archived by date.
 ### Changelog
 
 ```
+v0.21  2026-09-24  Readability in direct sunlight, which is where this app is
+                   used. New sun mode, third in the header toggle and
+                   remembered across loads - the previous two were not
+                   persisted at all, which for the outdoor one would have
+                   meant setting it again every time. Glare adds a constant
+                   sheet of reflected light to every pixel, so it flattens
+                   contrast ratios and hits dark screens hardest; sun mode
+                   answers with maximum luminance difference rather than
+                   taste: white ground, black text, no mid greys, solid 2px
+                   borders where hairlines were, no shadows, one step up the
+                   type scale, and solid LIVE badges. Measured in Chromium
+                   with alpha composited against each element's real
+                   background: 7.2:1 to 21:1 across the board.
+                   Fixed along the way, in all three themes, four things that
+                   were under the 4.5:1 floor before any sun was involved: the
+                   walk distance (1.9:1) and the clock time under the
+                   countdown (2.0:1) were set in --faint; the LIVE badge was
+                   10px bold on a tint of its own colour (3.8:1); the delay
+                   tag was one hardcoded red that measured 3.2:1 on a dark
+                   card and is now a per-theme token. The selected filter chip
+                   (3.5:1) now uses the darker accent.
+
 v0.20  2026-09-22  Fixed: the transport filter hid its own options. The chip
                    row scrolled sideways with the scrollbar hidden for looks,
                    so on a 390 px phone Bus and Regional sat past the right
@@ -379,7 +401,7 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.20`, DEVELOPMENT. The full loop works end to end against live
+Prototype, `v0.21`, DEVELOPMENT. The full loop works end to end against live
 data: departures → exit stop → verdict with route spine and shade meter →
 follow-the-ride, with live radar, the best-departure finder, the transport
 filter and opt-in encrypted history, in German and English, deployed at the
