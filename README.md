@@ -1,4 +1,4 @@
-# SunSide Berlin - v0.22
+# SunSide Berlin - v0.23
 
 **Status:** DEVELOPMENT
 **Versioning:** `v0.x` = development/testing, `v1.x` = production-ready
@@ -131,6 +131,7 @@ Worker - but two things still work:
 | Sun-side verdict | Sit left / sit right / neutral, with the sun's azimuth and elevation, computed per segment and distance-weighted |
 | Route spine | Travel-order stop list on the result screen; the rail between stops is tinted by which side the sun strikes on that segment, with board/exit/flips flags and per-segment bearing + km |
 | Shade meter | Distance-weighted km bar in the verdict card: shade-left / even / shade-right, each share paired with its number |
+| Follow the ride (scroll cue) | The journey list has to stay a scroll container, since auto-follow drives it by `scrollTop`, so it says so instead: the bottom edge fades while there is more below and clears at the end |
 | Follow the ride | Journey view reached from the verdict: pinned status card (current segment, shade side, clock-estimate vs live-GPS source), the spine with current/passed states, a vertical progress bar, auto-follow with pause, and a replay once arrived. Clock/radar-driven, not a demo timer |
 | Flip warning | When the shaded side genuinely changes mid-trip, the verdict says so instead of averaging it away |
 | Live radar | The actual vehicle's GPS position via VBB radar (Berlin + Brandenburg only). Position, not heading: HAFAS's radar call will not return a passlist, so the bearing comes from stop geometry - which is the better source on anything but a dead-straight single leg |
@@ -156,6 +157,23 @@ History before v0.10 predates the numbering and is archived by date.
 ### Changelog
 
 ```
+v0.23  2026-09-24  The other half of the hidden-scroll complaint. The exit
+                   list was fixed in v0.22 by letting the page scroll; the
+                   follow-the-ride list cannot be, because auto-follow drives
+                   it by scrollTop, so it gets the affordance instead: the
+                   bottom edge fades while there is more below and clears at
+                   the end, re-evaluated on every follow tick and not only on
+                   a manual scroll. A fade that never clears is just a
+                   gradient nobody can explain.
+                   Measured what v0.22 actually buys, on a 37-stop M29 at the
+                   430x932 viewport it was reported from: before, 7 stops
+                   readable without touching anything, a 156px empty band
+                   below the list and a page that did not scroll at all -
+                   after, 11 readable, no band, the page scrolls and the row
+                   at the fold is cut by the screen edge, which is itself the
+                   cue that there is more. The waste grew with the screen,
+                   because the cap was a fixed 340px.
+
 v0.22  2026-09-24  Added: the theme follows the sun by default. Auto is a
                    fourth mode and the new default, resolved from the sun's
                    ELEVATION at the rider's position - which this app already
@@ -429,7 +447,7 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.22`, DEVELOPMENT. The full loop works end to end against live
+Prototype, `v0.23`, DEVELOPMENT. The full loop works end to end against live
 data: departures → exit stop → verdict with route spine and shade meter →
 follow-the-ride, with live radar, the best-departure finder, the transport
 filter and opt-in encrypted history, in German and English, deployed at the

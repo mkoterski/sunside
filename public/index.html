@@ -450,6 +450,16 @@ button:focus-visible,.dep-card:focus-visible,.stop-item:focus-visible{outline:2p
 .j-track{top:10px;bottom:30px;background:var(--progress-track)}
 .j-fill{top:10px;height:0;background:var(--sun);transition:height .6s ease}
 .j-list{position:relative;max-height:56dvh;overflow-y:auto}
+/* This list has to stay a scroll container - follow-the-ride drives it by
+   scrollTop - so it cannot hand its scrolling to the page the way the exit
+   list now does. Instead it says so: the bottom edge fades while there is
+   more below and clears at the end. A fade that never clears is just a
+   gradient nobody can explain, which is why it is toggled rather than
+   painted on. */
+.j-wrap::after{content:'';position:absolute;left:0;right:0;bottom:0;height:44px;
+  background:linear-gradient(to top,var(--bg),transparent);
+  pointer-events:none;opacity:0;transition:opacity var(--ease)}
+.j-wrap.more::after{opacity:1}
 .j-list .spine-row{transition:opacity .4s ease}
 .j-list .spine-row.passed{opacity:.4}
 .j-list .spine-row.current .spine-dot{width:14px;height:14px;background:var(--sun);
@@ -1038,7 +1048,7 @@ const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
 // One constant for both places the build shows itself: the console banner and
 // the footer. Two hand-edited strings drift, and a footer that lies about the
 // build is worse than no footer.
-const APP_VERSION='0.22';
+const APP_VERSION='0.23';
 console.log(`SunSide Berlin v${APP_VERSION} - API base:`,API);
 
 // Project page rather than the repository: it is the page that explains what
@@ -1842,7 +1852,17 @@ function renderJourney(){
   const {rows,legs,flip}=legAnalysis;
   document.getElementById('j-list').innerHTML=
     rows.map((s,i)=>spineRowHTML(s,i,rows,legs,flip,{id:`j-row-${i}`})).join('');
+  jScrollCue();
 }
+
+// Is there more of the ride below the fold? Drives the fade on .j-wrap.
+function jScrollCue(){
+  const l=document.getElementById('j-list');
+  const w=document.querySelector('#scr-journey .j-wrap');
+  if(!l||!w)return;
+  w.classList.toggle('more',l.scrollHeight-l.scrollTop-l.clientHeight>4);
+}
+document.getElementById('j-list').addEventListener('scroll',jScrollCue,{passive:true});
 
 function updateJourney(){
   if(!legAnalysis)return;
@@ -1881,6 +1901,9 @@ function updateJourney(){
     const cur=document.getElementById(`j-row-${idx}`);
     if(cur)list.scrollTop=Math.max(0,cur.offsetTop-70);
   }
+  // Auto-follow moves the list under the rider, so the cue is re-evaluated
+  // on every tick and not only when they scroll it themselves.
+  jScrollCue();
 }
 
 function jToggle(){
