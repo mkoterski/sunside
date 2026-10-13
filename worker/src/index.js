@@ -139,7 +139,7 @@ const MOTIS_BASE = 'https://api.transitous.org';
 // also asks for a visible link to transitous.org/sources, which the SPA
 // renders whenever MOTIS served the data.
 const MOTIS_UA =
-  'sunside-berlin/0.26 (+https://github.com/mkoterski/sunside; matthias.koterski@nextwind.de)';
+  'sunside-berlin/0.27 (+https://github.com/mkoterski/sunside; matthias.koterski@nextwind.de)';
 
 // GTFS route types as MOTIS names them, mapped onto the product vocabulary the
 // SPA already uses for badge colours and the filter chips.
@@ -1012,7 +1012,7 @@ export default {
       const cfg = vbbConfig(env);
       return withCors(jsonResp({
         ok: true,
-        version: '0.26',
+        version: '0.27',
         // The base is operational information worth seeing (test system or
         // production?); the access id is never reported, here or anywhere.
         upstreams: {

@@ -1,4 +1,4 @@
-# SunSide Berlin - v0.26
+# SunSide Berlin - v0.27
 
 **Status:** DEVELOPMENT
 **Versioning:** `v0.x` = development/testing, `v1.x` = production-ready
@@ -147,7 +147,7 @@ Worker - but two things still work:
 | | |
 |---|---|
 | Nearby departures | The 4 nearest stops inside the search radius, merged into one live board with delays and ordered by the stop's straight-line distance from you, nearest on top, soonest first within a stop. One card per line and direction, so overlapping stops cannot crowd a line off the list. The query position is rounded to ~110 m so nearby riders share cache entries; every distance on screen is measured from your actual fix instead, because measured from that grid it was up to ~50 m off and put stops in the wrong order |
-| Search radius | A slider on the board, 0-2000 m in 100 m steps, remembered per device. It decides which stops are eligible, not how many are asked: growing the fan-out with the radius was built, measured in Wedding - stops 5 to 8 added no new line - and dropped. Nothing inside the radius is an answer on the board with the slider still in reach, not an error screen |
+| Search radius | A slider on the board, 0-2000 m in 100 m steps, remembered per device. The query itself is always the same 2000 m circle - one cache entry per grid cell - and the slider filters by your real distance; asking for the slider's radius around the rounded grid point missed stops on the far side of it. It decides which stops are eligible, not how many are asked: growing the fan-out with the radius was built, measured in Wedding - stops 5 to 8 added no new line - and dropped. Nothing inside the radius is an answer on the board with the slider still in reach, not an error screen |
 | Transport filter | Chips above the board for S-Bahn / U-Bahn / Tram / Bus / Regional, multi-select, persisted. The row wraps rather than scrolling sideways, so no option sits off the edge of a phone unannounced. Counts come from the unfiltered board, so a chip says what picking it gives you. Filtering is client-side, so every combination shares one proxy cache key |
 | Refresh | Re-reads the GPS fix, not just the board. The location label prints the coordinates, accuracy and time of the fix, so a refresh is visibly a new one. A cached fix older than 30 s is not accepted as current - the device is asked to look again - and no request can leave the screen on "loading": after 20 s it ends with the last fix, labelled stale. A hidden tab lets go of the location at once, and coming back to the board after a minute away re-reads it without a tap |
 | Demo mode | A fixed Hugenottenplatz location for trying the flow without granting geolocation |
@@ -183,6 +183,33 @@ History before v0.10 predates the numbering and is archived by date.
 ### Changelog
 
 ```
+v0.27  2026-10-13  An independent review of v0.26 raised ten findings. Each
+                   got a browser check written to fail on v0.26 and pass on
+                   the fix, and all ten were real. The worst was introduced
+                   by v0.26 itself:
+                   Fixed: the radius query missed stops right next to the
+                   rider. It asked for stops within the radius of the ROUNDED
+                   grid point, then kept those within the radius of the rider
+                   - two circles up to ~65 m apart. At 100 m by Hermannplatz
+                   it never asked for U Hermannplatz, 53 m away; 9 stops were
+                   missed across 20 measured cases. The query is now always
+                   2000 m and the slider filters, which also restores one
+                   cache key per grid cell instead of one per slider position.
+                   Fixed: a slider reload that finished after the rider had
+                   tapped a departure pulled them back to the board.
+                   Fixed, follow-the-ride: no poll at all when the vehicle was
+                   not in range at selection; the first poll 30 s after
+                   opening instead of at once; after a missed poll, a search
+                   box left where a fast train had been two polls ago (it now
+                   moves to the timetable position); a slow answer from a
+                   previous session landing in the next one.
+                   Fixed: a back/forward-cache restore counted as two returns
+                   and could set off a GPS read after a 3 s absence; a phone
+                   clock running fast made every fix look stale (21.3 s per
+                   refresh, measured), now judged by the provider producing a
+                   sequence of fixes; overlapping location requests could
+                   leave a watch that hiding the tab no longer stopped.
+
 v0.26  2026-10-13  Added: a search radius, 0-2000 m in 100 m steps, on the
                    board and remembered; and the board ordered by the stop's
                    straight-line distance from the rider, nearest on top.
@@ -537,7 +564,7 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.26`, DEVELOPMENT, deployed at the URL above. The full loop works
+Prototype, `v0.27`, DEVELOPMENT, deployed at the URL above. The full loop works
 end to end against live data: departures → exit stop → verdict with route spine
 and shade meter → follow-the-ride, with live radar, the best-departure finder,
 the transport filter and opt-in encrypted history, in German and English.

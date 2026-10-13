@@ -848,7 +848,6 @@ de:{
   whereOff:'Wo steigst du aus?',
   diffStop:'← Andere Haltestelle wählen',
   locDenied:'Standort abgelehnt - Demo wird verwendet.',
-  noStopsNearby:'Keine Haltestellen in der Nähe gefunden.',
   noStopsInRadius:m=>`Keine Haltestelle im Umkreis von ${m} m. Vergrößere den Radius.`,
   radius:'Umkreis', radiusAria:m=>`Suchradius ${m} Meter`,
   gpsFailed:'Dein Standort konnte gerade nicht ermittelt werden. Versuch es noch einmal oder nutze den Demo-Standort.',
@@ -946,7 +945,6 @@ en:{
   whereOff:'Where do you get off?',
   diffStop:'← Choose different stop',
   locDenied:'Location denied - using demo.',
-  noStopsNearby:'No stops found nearby.',
   noStopsInRadius:m=>`No stop within ${m} m. Widen the radius.`,
   radius:'Radius', radiusAria:m=>`Search radius ${m} metres`,
   gpsFailed:'Your location could not be determined just now. Try again, or use the demo location.',
@@ -1049,7 +1047,7 @@ function applyLang(){
   const active=document.querySelector('.screen.active')?.id;
   radiusLabel();
   if(active==='scr-deps'&&boardState==='deps'){renderDeps(allDeps);setLocLabel()}
-  if(active==='scr-deps'&&boardState==='empty')renderNoStops();
+  if(active==='scr-deps'&&boardState==='empty')renderNoStops(false);
   if(active==='scr-stops'&&selDep){renderJourneyCard();renderVehicleStrip(radarVehicle);renderStops(selTrip)}
   if(active==='scr-result'&&selStops){calcSun(selStopIdx,selStops,selDepChosen)}
   if(active==='scr-journey'&&legAnalysis){renderJourney();updateJourney()}
@@ -1141,7 +1139,7 @@ const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
 // One constant for both places the build shows itself: the console banner and
 // the footer. Two hand-edited strings drift, and a footer that lies about the
 // build is worse than no footer.
-const APP_VERSION='0.26';
+const APP_VERSION='0.27';
 console.log(`SunSide Berlin v${APP_VERSION} - API base:`,API);
 
 // Project page rather than the repository: it is the page that explains what
@@ -1256,11 +1254,18 @@ let abortFix=null;
 // (code 1), with code 3 when the deadline passes with nothing at all, and
 // with code 'aborted' when the page was hidden mid-acquisition.
 function acquireFix(){
+  // One acquisition at a time. A new one quietly retires the old, which
+  // rejects with 'superseded' for its caller to ignore. With a single global
+  // canceller, the first of two overlapping acquisitions to finish cleared it,
+  // and hiding the tab could no longer stop the other's watch.
+  if(abortFix)abortFix('superseded');
   return new Promise((resolve,reject)=>{
     const geo=navigator.geolocation;
-    let settled=false, watchId=null, fallback=null;
+    let settled=false, watchId=null, fallback=null, prevWatchTs=null;
+    const cancel=code=>fail({code:code||'aborted'});
     const end=()=>{
-      settled=true;clearTimeout(deadline);clearTimeout(nudge);abortFix=null;
+      settled=true;clearTimeout(deadline);clearTimeout(nudge);
+      if(abortFix===cancel)abortFix=null;
       if(watchId!=null){geo.clearWatch(watchId);watchId=null}
     };
     const ok=(pos,fresh)=>{if(!settled){end();resolve({pos,fresh})}};
@@ -1270,7 +1275,17 @@ function acquireFix(){
     const watch=()=>{
       if(settled||watchId!=null)return;
       watchId=geo.watchPosition(
-        q=>{if(isFresh(q))ok(q,true);else fallback=q},
+        // The timestamp test alone fails on a phone whose clock is off: on
+        // Android the fix carries the provider's time, so a clock running a
+        // minute fast makes every fix look a minute old, and every refresh
+        // would sit out the full deadline to end up labelled stale. A cache
+        // cannot produce a sequence of later and later fixes; a running
+        // location provider does. Two from the watch, the second newer than
+        // the first, is the provider working - whatever the clock says.
+        q=>{
+          if(isFresh(q)||(prevWatchTs!=null&&q.timestamp>prevWatchTs))return ok(q,true);
+          fallback=q;prevWatchTs=q.timestamp;
+        },
         // Only a refusal ends it early; anything else may still resolve
         // before the deadline, so keep listening.
         e=>{if(e&&e.code===1)fail(e)},
@@ -1281,7 +1296,7 @@ function acquireFix(){
     // case, not a slow one: start the watch alongside it rather than waiting
     // for an answer that may never come to tell us to.
     const nudge=setTimeout(watch,5000);
-    abortFix=()=>fail({code:'aborted'});
+    abortFix=cancel;
     geo.getCurrentPosition(
       p=>{if(isFresh(p))ok(p,true);else{fallback=p;watch()}},
       e=>{if(e&&e.code===1)fail(e);else watch()},
@@ -1302,6 +1317,7 @@ function requestLocation(){
   show('scr-load');
   acquireFix().then(({pos,fresh})=>{applyFix(pos);locStale=!fresh;loadDeps()})
     .catch(e=>{
+      if(e&&e.code==='superseded')return;
       // Hidden mid-request: go back to the start and ask again on return.
       if(e&&e.code==='aborted'){pendingOnReturn=requestLocation;show('scr-perm');return}
       // Only a refusal means the demo. A timeout or a missing signal used to
@@ -1355,6 +1371,24 @@ let radiusM=(function(){
 // radius genuinely matters - outside the cities - there are rarely more than
 // four stops inside 2 km to begin with.
 const FAN_OUT=4;
+
+// What the nearby query asks for: the 25 stops nearest the grid point within
+// 2000 m, the Worker's own ceilings. The slider then filters by the rider.
+const NEARBY={m:2000,n:25};
+
+// Can the stop count be trusted, or should it read "25+"? The answer is the
+// n stops nearest the GRID POINT, so it holds every stop within `reach` of
+// it - all of them, if fewer than n came back. A stop inside the rider's
+// radius is at most radius + offset from the grid point, so the count is
+// complete exactly when that fits inside the reach. One known gap: the
+// official ReST provider collapses up to 50 platforms into stations, so it
+// can return fewer than n while more exist; it is the fallback, not the lead.
+function nearbyIncomplete(raw,radius,gLat,gLon){
+  const off=haversine(uLat,uLon,gLat,gLon)*1000;
+  const reach=raw.length<NEARBY.n?NEARBY.m
+    :Math.max(...raw.map(s=>s.location?haversine(gLat,gLon,s.location.latitude,s.location.longitude)*1000:0));
+  return radius+off>reach;
+}
 
 function radiusLabel(){
   document.getElementById('radius-val').textContent=`${radiusM} m`;
@@ -1411,21 +1445,32 @@ let loadSeq=0;
 async function loadDeps(opts={}){
   const seq=++loadSeq;
   const current=()=>seq===loadSeq;
+  // A quiet load - the slider's - repaints the board where it is and never
+  // navigates. It used to end in show('scr-deps') like any load, which pulled
+  // a rider who had already tapped a departure back to the board mid-choice:
+  // inside the 250 ms debounce, or at any time from the keyboard, since
+  // .click() ignores the pointer-events the busy state relies on.
+  const nav=!opts.quiet;
   const list=document.getElementById('dep-list');
   if(opts.quiet)list.classList.add('busy');
   try{
     // Nothing is within 0 m; there is no request worth making for that.
-    if(radiusM===0){renderNoStops();return}
+    if(radiusM===0){renderNoStops(nav);return}
     const m=radiusM;
     // Round coords to 3 decimals (~110m grid) so nearby users hit identical
     // cache keys at the proxy. This multiplies cache hit rate during clustering.
     // The precision this costs is paid back by losMetres(), below.
     const qLat=uLat.toFixed(3), qLon=uLon.toFixed(3);
-    // results=25 is the Worker's ceiling: the count in the label should be the
-    // true number of stops inside the circle, not wherever the query stopped.
-    const resp=await apiFetch(`${API}/locations/nearby?latitude=${qLat}&longitude=${qLon}&distance=${m}&results=25`);
+    // The query is always the widest circle, NOT the slider's radius. v0.26
+    // asked for stops within the radius of the GRID POINT and then kept those
+    // within the radius of the RIDER - two circles up to ~65 m apart, so stops
+    // inside the rider's circle on the far side were never asked for. Measured
+    // live: at 100 m by Hermannplatz it missed U Hermannplatz itself, 53 m
+    // away; 9 stops missed across 20 rider/radius cases. One fixed query also
+    // keeps one cache key per grid cell instead of one per slider position.
+    const resp=await apiFetch(`${API}/locations/nearby?latitude=${qLat}&longitude=${qLon}&distance=${NEARBY.m}&results=${NEARBY.n}`);
     if(!current())return;
-    if(!resp.ok){showErr(resp.status>=500?t('srcDown'):t('loadFailed'));return}
+    if(!resp.ok){showErr(resp.status>=500?t('srcDown'):t('loadFailed'),nav);return}
     // The Worker names the upstream that answered. Everything downstream of
     // this call follows the ids it returned, so one read here is enough.
     dataSource=resp.headers.get('X-Data-Source')||null;
@@ -1437,9 +1482,9 @@ async function loadDeps(opts={}){
     const nr=raw.map(s=>({...s,_los:losMetres(s)}))
       .filter(s=>s._los==null||s._los<=m)
       .sort((a,b)=>(a._los??Infinity)-(b._los??Infinity));
-    if(!nr.length){renderNoStops();return}
+    if(!nr.length){renderNoStops(nav);return}
     const fan=nr.slice(0,FAN_OUT);
-    stopCounts={shown:fan.length,total:nr.length,more:raw.length>=25,m};
+    stopCounts={shown:fan.length,total:nr.length,more:nearbyIncomplete(raw,m,+qLat,+qLon),m};
 
     // Every product is requested regardless of the filter, so all filter
     // combinations share one proxy cache key instead of minting a new upstream
@@ -1461,13 +1506,13 @@ async function loadDeps(opts={}){
     boardState='deps';
     setLocLabel();
     renderDeps(allDeps);
-    show('scr-deps');
+    if(nav)show('scr-deps');
   }catch(e){
     if(!current())return;
     console.error(e);
     // A timeout means the request stalled, which in practice is the data
     // source hanging - tell the truth rather than blaming the connection.
-    showErr(e?.name==='TimeoutError'?t('srcDown'):t('loadFailed'));
+    showErr(e?.name==='TimeoutError'?t('srcDown'):t('loadFailed'),nav);
   }finally{
     if(current())list.classList.remove('busy');
   }
@@ -1477,7 +1522,7 @@ async function loadDeps(opts={}){
 // is one slider move from an answer, so the slider has to stay on screen - and
 // before the radius was adjustable this went to the error screen, whose only
 // way out was "start over".
-function renderNoStops(){
+function renderNoStops(navigate=true){
   allDeps=[];
   boardState='empty';
   stopCounts={shown:0,total:0,more:false,m:radiusM};
@@ -1485,7 +1530,7 @@ function renderNoStops(){
   document.getElementById('filter-row').innerHTML='';
   document.getElementById('dep-list').innerHTML=
     `<div class="state-view"><div class="sv-icon">📍</div><h2>${t('noDeps')}</h2><p>${t('noStopsInRadius')(radiusM)}</p></div>`;
-  show('scr-deps');
+  if(navigate)show('scr-deps');
 }
 
 function depMs(d){return new Date(d.when||d.plannedWhen).getTime()}
@@ -2161,20 +2206,52 @@ function journeyIdx(){
   return clockIdx(rows.map(s=>s.arrival),Date.now());
 }
 
+// Each follow gets a session number; a radar answer counts only for the
+// session that asked. Checking that a timer exists was not enough: leave the
+// screen with a request in flight, come back, and the old answer - for the old
+// centre, possibly the old departure - landed in the new session.
+let radarSession=0;
+
+// Where to look for the vehicle. Its last confirmed position while that is the
+// latest poll's; after a miss, where the timetable says it should be by now,
+// because a train covers ~670 m per 30 s poll at 80 km/h and a 1.5 km box left
+// on a position from two polls ago has lost it for good. Before any fix at all
+// - and while still waiting at the platform - null, which means the boarding
+// stop, the place it is coming to.
+function radarCentre(){
+  const last=radarVehicle?.location;
+  if(last&&Date.now()-radarAt<=RADAR_REFRESH_MS+10000)return {lat:last.latitude,lon:last.longitude};
+  const rows=legAnalysis?.rows;
+  if(rows&&rows.length){
+    const r=rows[Math.min(clockIdx(rows.map(x=>x.arrival),Date.now()),rows.length-1)];
+    if(r&&r.lat!=null)return {lat:r.lat,lon:r.lon};
+  }
+  return null;
+}
+
+// The poll runs for the departure the rider picked, whether or not a vehicle
+// was found at the moment of picking: one eight minutes out is still well
+// beyond the 1.5 km box, and v0.26 took "not found yet" as "never poll". It
+// asks at once on opening, not 30 s later - the fix taken at selection is
+// usually minutes old by the time the rider taps Follow.
 function startRadarFollow(){
   stopRadarFollow();
-  if(!radarActive||!radarVehicle)return;
-  radarTimer=setInterval(async()=>{
-    if(document.hidden)return;
-    const last=radarVehicle?.location;
-    const v=await fetchVehiclePosition(selDep,last?{lat:last.latitude,lon:last.longitude}:null);
-    // The screen may have been left while the request was in flight.
-    if(!radarTimer)return;
+  if(!radarActive)return;
+  const session=radarSession;
+  const tick=async()=>{
+    if(document.hidden||session!==radarSession)return;
+    const v=await fetchVehiclePosition(selDep,radarCentre());
+    if(session!==radarSession)return;
     if(v){radarVehicle=v;radarAt=Date.now()}
     updateJourney();
-  },RADAR_REFRESH_MS);
+  };
+  radarTimer=setInterval(tick,RADAR_REFRESH_MS);
+  tick();
 }
-function stopRadarFollow(){if(radarTimer){clearInterval(radarTimer);radarTimer=null}}
+function stopRadarFollow(){
+  radarSession++;
+  if(radarTimer){clearInterval(radarTimer);radarTimer=null}
+}
 
 function openJourney(){
   jPaused=false;jReplay=null;
@@ -2363,12 +2440,12 @@ function show(id){
     if(uLat)updateSunBar(uLat,uLon);
   }
 }
-function showErr(msg){
+function showErr(msg,navigate=true){
   boardState='error';
   document.getElementById('filter-row').innerHTML='';
   document.getElementById('fix-label').textContent='';
   document.getElementById('dep-list').innerHTML=`<div class="state-view"><div class="sv-icon">⚠️</div><h2>${t('error')}</h2><p>${msg}</p><button class="btn btn-ghost" onclick="show('scr-perm')" style="margin-top:var(--sp4)">${t('startOver')}</button></div>`;
-  show('scr-deps');
+  if(navigate)show('scr-deps');
 }
 // Refresh re-reads the GPS fix; it does not merely re-fetch the board. Up to
 // v0.16 it reused the coordinates captured at the first permission grant, so a
@@ -2383,6 +2460,7 @@ function doRefresh(){
   show('scr-load');
   acquireFix().then(({pos,fresh})=>{applyFix(pos);locStale=!fresh;loadDeps()})
     .catch(e=>{
+      if(e&&e.code==='superseded')return;
       // Hidden mid-request: put the board back and read again on return.
       if(e&&e.code==='aborted'){pendingOnReturn=doRefresh;show('scr-deps');return}
       // A failed re-read is no reason to lose the board: keep the previous
@@ -2397,14 +2475,21 @@ function doRefresh(){
 // expects it to show where they are now. Only the board refreshes itself:
 // on the exit-stop, verdict or journey screens a new position would change
 // nothing but the screen under the rider's thumb.
-let hiddenAt=null, pendingOnReturn=null;
+let hiddenAt=null, pendingOnReturn=null, lastReturn={via:null,at:0};
 function onHidden(){
   hiddenAt=Date.now();
   if(abortFix)abortFix();
 }
-function onVisible(){
-  // A page restored from the back/forward cache may never have seen itself
-  // hidden; the age of the fix is the next best measure of time away.
+// A restore from the back/forward cache can announce itself twice - pageshow
+// and visibilitychange, in an order browsers do not agree on. v0.26 treated
+// each as a return: the first consumed hiddenAt, the second then measured
+// "time away" by the age of the fix, and a 3 s absence after 5 minutes on the
+// board set off a fresh GPS read. Now the second half of one restore is
+// recognised and ignored, whichever comes first.
+function onVisible(via){
+  if(lastReturn.via&&lastReturn.via!==via&&Date.now()-lastReturn.at<1000)return;
+  lastReturn={via,at:Date.now()};
+  // A page that never saw itself hidden has only the age of its fix to go on.
   const away=hiddenAt!=null?Date.now()-hiddenAt:(locAt?Date.now()-locAt.getTime():0);
   hiddenAt=null;
   const next=pendingOnReturn;pendingOnReturn=null;
@@ -2412,8 +2497,8 @@ function onVisible(){
   const onBoard=document.getElementById('scr-deps').classList.contains('active');
   if(onBoard&&locSource==='gps'&&away>=60000)doRefresh();
 }
-document.addEventListener('visibilitychange',()=>{document.hidden?onHidden():onVisible()});
-window.addEventListener('pageshow',e=>{if(e.persisted)onVisible()});
+document.addEventListener('visibilitychange',()=>{document.hidden?onHidden():onVisible('visibility')});
+window.addEventListener('pageshow',e=>{if(e.persisted)onVisible('pageshow')});
 
 // v2A a11y: card rows carry role="button" + tabindex, so Enter/Space must
 // activate them like a real button. One delegated listener, not per-card.

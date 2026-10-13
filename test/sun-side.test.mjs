@@ -285,5 +285,17 @@ eq(themeForElevation(null, "light"), null, "no position means no opinion");
 eq(themeForElevation(undefined, "light"), null, "and neither does an undefined one");
 eq(themeForElevation(NaN, "light"), null, "NaN is not a latitude's worth of information");
 
+// -- v0.27: can the stop count be trusted? ------------------------------------
+// Mirror of nearbyIncomplete() in public/index.html, distances in metres: the
+// query returns the n stops nearest the GRID POINT, so it covers everything
+// within `reach` of it - all of 2000 m when fewer than n came back. A stop in
+// the rider's radius is at most radius + offset from the grid point.
+const incomplete = (returned, n, reachIfFull, radius, offset) =>
+  radius + offset > (returned < n ? 2000 : reachIfFull);
+eq(incomplete(13, 25, 0, 700, 50), false, "fewer than 25 came back: the whole 2 km was covered, the count is exact");
+eq(incomplete(25, 25, 900, 700, 50), false, "25 reaching 900 m from the grid cover a 700 m radius 50 m off it");
+eq(incomplete(25, 25, 900, 1400, 50), true, "but not a 1400 m radius: the label says 25+");
+eq(incomplete(25, 25, 740, 700, 63), true, "a 63 m offset is enough to tip a 700 m radius over a 740 m reach");
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
