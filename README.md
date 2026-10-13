@@ -149,13 +149,13 @@ Worker - but two things still work:
 | Nearby departures | The 4 nearest stops inside the search radius, merged into one live board with delays and ordered by the stop's straight-line distance from you, nearest on top, soonest first within a stop. One card per line and direction, so overlapping stops cannot crowd a line off the list. The query position is rounded to ~110 m so nearby riders share cache entries; every distance on screen is measured from your actual fix instead, because measured from that grid it was up to ~50 m off and put stops in the wrong order |
 | Search radius | A slider on the board, 0-2000 m in 100 m steps, remembered per device. The query itself is always the same 2000 m circle - one cache entry per grid cell - and the slider filters by your real distance; asking for the slider's radius around the rounded grid point missed stops on the far side of it. It decides which stops are eligible, not how many are asked: growing the fan-out with the radius was built, measured in Wedding - stops 5 to 8 added no new line - and dropped. Nothing inside the radius is an answer on the board with the slider still in reach, not an error screen |
 | Transport filter | Chips above the board for S-Bahn / U-Bahn / Tram / Bus / Regional, multi-select, persisted. The row wraps rather than scrolling sideways, so no option sits off the edge of a phone unannounced. Counts come from the unfiltered board, so a chip says what picking it gives you. Filtering is client-side, so every combination shares one proxy cache key |
-| Refresh | Re-reads the GPS fix, not just the board. The location label prints the coordinates, accuracy and time of the fix, so a refresh is visibly a new one. A cached fix older than 30 s is not accepted as current - the device is asked to look again - and no request can leave the screen on "loading": after 20 s it ends with the last fix, labelled stale. A hidden tab lets go of the location at once, and coming back to the board after a minute away re-reads it without a tap |
+| Refresh | Re-reads the GPS fix, not just the board. The location label prints the coordinates, accuracy and time of the fix, so a refresh is visibly a new one. A cached fix older than 30 s is not accepted as current - the device is asked to look again - and no request can leave the screen on "loading": after 20 s it ends with the last fix, labelled stale. A phone whose clock runs fast is handled too: a location provider producing later and later fixes is trusted whatever the clock says, which a cache cannot do. A hidden tab lets go of the location at once, and coming back to the board after a minute away re-reads it without a tap |
 | Demo mode | A fixed Hugenottenplatz location for trying the flow without granting geolocation |
 | Exit picker | The trip's real stopover list, boarding stop marked, each later stop tappable. Every stop, not the first eight: the list flows with the page rather than sitting in a 340px box whose scrollbar a phone never draws |
 | Sun-side verdict | Sit left / sit right / neutral, with the sun's azimuth and elevation, computed per segment and distance-weighted |
 | Route spine | Travel-order stop list on the result screen; the rail between stops is tinted by which side the sun strikes on that segment, with board/exit/flips flags and per-segment bearing + km |
 | Shade meter | Distance-weighted km bar in the verdict card: shade-left / even / shade-right, each share paired with its number |
-| Follow the ride | Journey view reached from the verdict: pinned status card (current segment, shade side, clock-estimate vs live-GPS source), the spine with current/passed states, a vertical progress bar, auto-follow with pause, and a replay once arrived. Clock/radar-driven, not a demo timer: the vehicle is re-read every 30 s while this screen is up, and a radar fix older than 75 s stops counting as live, so the clock estimate takes over and the card says so. Its list stays a scroll container, since auto-follow drives it by `scrollTop`, so it says so: the bottom edge fades while there is more below and clears at the end |
+| Follow the ride | Journey view reached from the verdict: pinned status card (current segment, shade side, clock-estimate vs live-GPS source), the spine with current/passed states, a vertical progress bar, auto-follow with pause, and a replay once arrived. Clock/radar-driven, not a demo timer: the vehicle is looked up the moment the screen opens and every 30 s after, for the departure you picked even if it was not yet in range when you picked it. After a missed lookup the search moves to where the timetable says the vehicle should be, rather than staying where a fast train was two polls ago. A radar fix older than 75 s stops counting as live, so the clock estimate takes over and the card says so. Its list stays a scroll container, since auto-follow drives it by `scrollTop`, so it says so: the bottom edge fades while there is more below and clears at the end |
 | Flip warning | When the shaded side genuinely changes mid-trip, the verdict says so instead of averaging it away |
 | Exit screen density | The journey summary and the vehicle position are one card, not two boxes with two borders and a gap. Measured at 430x932: 393px of chrome above the first stop became 286px, and stops readable without touching anything went from 7 to 13 |
 | Live radar | The actual vehicle's GPS position via VBB radar (Berlin + Brandenburg only). Position, not heading: HAFAS's radar call will not return a passlist, so the bearing comes from stop geometry - which is the better source on anything but a dead-straight single leg |
@@ -564,20 +564,38 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.27`, DEVELOPMENT, deployed at the URL above. The full loop works
-end to end against live data: departures → exit stop → verdict with route spine
+Prototype, `v0.27`, DEVELOPMENT. The app is served from the URL above, and its
+`/healthz` reports which version is live - this file cannot know when a deploy
+happened, so it does not claim one. The full loop works end to end against
+live data: departures → exit stop → verdict with route spine
 and shade meter → follow-the-ride, with live radar, the best-departure finder,
-the transport filter and opt-in encrypted history, in German and English.
+the transport filter, a search radius, and opt-in encrypted history, in German
+and English.
 
 Verified end to end in a desktop browser at Schönhauser Allee/Bornholmer Str.
 (Berlin), Cottbus (Brandenburg), Rostock and Greifswald
 (Mecklenburg-Vorpommern), and on an iPhone against the deployed Worker. The
 interface work since v0.21 was measured rather than eyeballed: contrast ratios
 per element with alpha composited against each element's real background, and
-layout at 390x932 and 430x932, both in Chromium.
+layout at 390x844 and 430x932, both in Chromium.
 
-The v2A design handoff is fully implemented. Two things are known-open and
-deliberate, both waiting on VBB: the official ReST API stays second in the
+v0.26 and v0.27 went one step further. Location handling was tested against a
+scripted stand-in for the browser's geolocation (cached fix, silent request,
+refusal, timeout, hiding mid-request, a fast clock), and an independent review
+of v0.26 was checked finding by finding: each of its ten findings got a browser
+check run against the old code and the fix, and counted only if it failed on
+the first and passed on the second. All ten did.
+
+The v2A design handoff is fully implemented.
+
+Open and unconfirmed: Refresh failing to produce a new position with SunSide
+open in a second Chrome tab on Android. It could not be reproduced outside a
+real phone, so v0.26 closed both mechanisms that produce that symptom, each
+proven against the scripted geolocation - whether a real phone hits one of
+them, or a third, is still to be seen. The coordinates line under "Nearby
+departures" prints the time of every fix, which is the way to check.
+
+Two things are known-open and deliberate, both waiting on VBB: the official ReST API stays second in the
 chain while its test system carries no realtime, and the radar still reports a
 position without a heading because `journeyPos`, the supported call that would
 fix it, returns nothing on that system. See
