@@ -191,12 +191,15 @@ header{
 .section{padding:var(--sp5)}
 .sec-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:var(--sp4);gap:var(--sp4)}
 .sec-title{font-size:var(--xs);font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
-.sec-sub{font-size:var(--xs);color:var(--faint);margin-top:2px}
+/* --muted, not --faint: the same 1.9:1 failure v0.21 fixed for the walk
+   distance, missed here. The fix line is how a rider checks that a refresh
+   really produced a new position, so it is information, not decoration. */
+.sec-sub{font-size:var(--xs);color:var(--muted);margin-top:2px}
 .refresh-btn{font-size:var(--xs);color:var(--accent);font-weight:700;padding:var(--sp1) var(--sp2);border-radius:var(--r-sm);flex-shrink:0}
 .refresh-btn:hover{background:var(--accent-bg)}
 /* The fix line sits below the header rather than inside it: squeezed next to
    the Refresh button it wrapped to four lines on a 375 px phone. */
-.fix-line{font-size:var(--xs);color:var(--faint);font-variant-numeric:tabular-nums;
+.fix-line{font-size:var(--xs);color:var(--muted);font-variant-numeric:tabular-nums;
   margin:calc(-1 * var(--sp3)) 0 var(--sp3)}
 
 /* ── State view ── */
@@ -280,6 +283,19 @@ header{
 .appver a{color:var(--muted);text-decoration:none}
 .appver a:hover,.appver a:focus-visible{color:var(--accent);
   text-decoration:underline;text-underline-offset:2px}
+
+/* ── Search radius ── */
+/* A native range input: it is keyboard- and screen-reader-operable for free,
+   and accent-color themes the thumb and fill in every mode, sun mode included.
+   min-height keeps the touch target at 44px even though the track is thin. */
+.radius-row{display:flex;align-items:center;gap:var(--sp3);margin:0 0 var(--sp2)}
+.radius-lbl{font-size:var(--xs);color:var(--muted);white-space:nowrap;
+  font-variant-numeric:tabular-nums;min-width:7.5em}
+.radius-lbl strong{color:var(--text);font-weight:700}
+.radius-row input{flex:1;min-width:0;min-height:44px;accent-color:var(--accent);cursor:pointer}
+/* While a new radius is loading the old board stays, dimmed, instead of
+   flashing the loading screen on every nudge of the slider. */
+.dep-list.busy{opacity:.45;pointer-events:none;transition:opacity var(--ease)}
 
 /* ── Product filter chips (F5) ── */
 /* The row wraps; it does not scroll sideways. It used to, with the scrollbar
@@ -616,6 +632,10 @@ button:focus-visible,.dep-card:focus-visible,.stop-item:focus-visible{outline:2p
       <button class="refresh-btn" onclick="doRefresh()" data-i18n="refresh">↻ Refresh</button>
     </div>
     <div class="fix-line" id="fix-label"></div>
+    <div class="radius-row">
+      <label class="radius-lbl" for="radius-input"><span data-i18n="radius">Radius</span> <strong id="radius-val">700 m</strong></label>
+      <input type="range" id="radius-input" min="0" max="2000" step="100" value="700">
+    </div>
     <div class="filter-row" id="filter-row"></div>
     <div class="dep-list" id="dep-list"></div>
   </div>
@@ -829,9 +849,15 @@ de:{
   diffStop:'← Andere Haltestelle wählen',
   locDenied:'Standort abgelehnt - Demo wird verwendet.',
   noStopsNearby:'Keine Haltestellen in der Nähe gefunden.',
+  noStopsInRadius:m=>`Keine Haltestelle im Umkreis von ${m} m. Vergrößere den Radius.`,
+  radius:'Umkreis', radiusAria:m=>`Suchradius ${m} Meter`,
+  gpsFailed:'Dein Standort konnte gerade nicht ermittelt werden. Versuch es noch einmal oder nutze den Demo-Standort.',
   loadFailed:'Laden fehlgeschlagen. Prüfe deine Verbindung.',
   srcDown:'Die VBB-Datenquelle antwortet gerade nicht. Das kommt vor - versuch es in ein paar Minuten noch einmal.',
-  stopsWithin:n=>`${n} Haltestellen im Umkreis von 700 m`,
+  // shown = stops whose boards are on screen, total = stops within the radius.
+  stopsWithin:(shown,total,m,more)=>shown===total
+    ?`${shown} ${shown===1?'Haltestelle':'Haltestellen'} im Umkreis von ${m} m`
+    :`Die ${shown} nächsten von ${total}${more?'+':''} Haltestellen im Umkreis von ${m} m`,
   gpsFix:(coords,acc,tm)=>acc!=null?`${coords} ±${acc} m · ${tm}`:`${coords} · ${tm}`,
   demoLoc:'Demo-Standort',
   gpsStale:'Standort nicht aktualisierbar - letzte Position',
@@ -921,9 +947,14 @@ en:{
   diffStop:'← Choose different stop',
   locDenied:'Location denied - using demo.',
   noStopsNearby:'No stops found nearby.',
+  noStopsInRadius:m=>`No stop within ${m} m. Widen the radius.`,
+  radius:'Radius', radiusAria:m=>`Search radius ${m} metres`,
+  gpsFailed:'Your location could not be determined just now. Try again, or use the demo location.',
   loadFailed:'Failed to load. Check connection.',
   srcDown:'The VBB data source is not responding right now. It happens - try again in a few minutes.',
-  stopsWithin:n=>`${n} stops within 700 m`,
+  stopsWithin:(shown,total,m,more)=>shown===total
+    ?`${shown} ${shown===1?'stop':'stops'} within ${m} m`
+    :`Nearest ${shown} of ${total}${more?'+':''} stops within ${m} m`,
   gpsFix:(coords,acc,tm)=>acc!=null?`${coords} ±${acc} m · ${tm}`:`${coords} · ${tm}`,
   demoLoc:'Demo location',
   gpsStale:'Could not refresh location - last known position',
@@ -1016,7 +1047,9 @@ function applyLang(){
   renderHistCard();
   renderAttrib();
   const active=document.querySelector('.screen.active')?.id;
-  if(active==='scr-deps'&&allDeps.length){renderDeps(allDeps);setLocLabel()}
+  radiusLabel();
+  if(active==='scr-deps'&&boardState==='deps'){renderDeps(allDeps);setLocLabel()}
+  if(active==='scr-deps'&&boardState==='empty')renderNoStops();
   if(active==='scr-stops'&&selDep){renderJourneyCard();renderVehicleStrip(radarVehicle);renderStops(selTrip)}
   if(active==='scr-result'&&selStops){calcSun(selStopIdx,selStops,selDepChosen)}
   if(active==='scr-journey'&&legAnalysis){renderJourney();updateJourney()}
@@ -1108,7 +1141,7 @@ const API=(typeof window!=='undefined'&&window.SUNSIDE_API)
 // One constant for both places the build shows itself: the console banner and
 // the footer. Two hand-edited strings drift, and a footer that lies about the
 // build is worse than no footer.
-const APP_VERSION='0.25';
+const APP_VERSION='0.26';
 console.log(`SunSide Berlin v${APP_VERSION} - API base:`,API);
 
 // Project page rather than the repository: it is the page that explains what
@@ -1135,9 +1168,25 @@ let selDep=null;
 let selTrip=null;
 let radarVehicle=null; // live vehicle position from /radar
 let radarActive=false; // true only for the originally-selected real-time departure
+// When radarVehicle was last confirmed, and the follow-the-ride poll. The
+// vehicle used to be located ONCE, when the departure was picked, and never
+// again - so on the journey screen "live GPS" meant the position from before
+// the rider boarded, frozen, and the current stop never advanced past it while
+// the status card said "Live GPS". Now it is re-read while that screen is up,
+// and a fix older than RADAR_FRESH_MS stops counting as live: the clock
+// estimate takes over and the card says so.
+const RADAR_REFRESH_MS=30000, RADAR_FRESH_MS=75000;
+let radarAt=0, radarTimer=null;
+function radarLive(){
+  return !!(radarActive&&radarVehicle?.location&&Date.now()-radarAt<=RADAR_FRESH_MS);
+}
 // Best-departure finder state: the chosen exit stop + the candidate departures of
 // the same line/direction we rank by shade, and the currently-active departure.
 let selStops=null, selStopIdx=null, selDepChosen=null;
+// The exit-stop list as rendered; each row's click hands calcSun its index
+// into this. The rows used to carry the whole array themselves, as JSON in
+// their onclick attributes - see renderStops.
+let stopRows=[];
 let candidateDeps=[], finderRows=[];
 let legAnalysis=null;  // spine + meter data, set per verdict in calcSun (v2A)
 let sunBarWhen=null;   // analysed departure time; null = live clock (v2A item 3)
@@ -1175,6 +1224,70 @@ setInterval(()=>{if(uLat)updateSunBar(uLat,uLon,sunBarWhen)},60000);
 // already 0, but several mobile browsers hand back a minutes-old cached fix
 // when the option is absent, which is exactly what a refresh must not do.
 const GEO_OPTS={timeout:10000,enableHighAccuracy:true,maximumAge:0};
+// A fix older than this is not "where you are now", whatever the browser says.
+const FIX_FRESH_MS=30000;
+// Our own ceiling on the whole acquisition. The browser's `timeout` is not
+// one: per spec it does not run while the request is waiting its turn, so a
+// request that never gets a turn never times out - and the screen it was
+// started from sits on "loading" for good.
+const FIX_DEADLINE_MS=20000;
+// Cancels the acquisition in flight, if there is one. Called when the page is
+// hidden, so a tab nobody is looking at never holds on to the location.
+let abortFix=null;
+
+// Ask for a position, and make sure what comes back is genuinely new.
+//
+// This exists for one report: with SunSide open in a second Chrome tab on
+// Android, Refresh stopped producing a new position until the other tab was
+// closed. Two failure modes produce exactly that, and both are handled:
+//
+//  - the request is answered at once from a cached fix minutes old. Checked
+//    by the fix's own timestamp; a stale one is kept only as a fallback while
+//    watchPosition - which makes the device actually go and look, where
+//    getCurrentPosition may be served from whatever was lying around - waits
+//    for a fresh one.
+//  - the request never settles at all. The deadline above ends it, with the
+//    fallback if there is one, labelled stale on screen, never as current.
+//
+// And the cause on the other side: a hidden tab gives up its request at once
+// (see onHidden), so it cannot be the one keeping the location busy.
+//
+// Resolves {pos, fresh}. Rejects with the browser's error for a refusal
+// (code 1), with code 3 when the deadline passes with nothing at all, and
+// with code 'aborted' when the page was hidden mid-acquisition.
+function acquireFix(){
+  return new Promise((resolve,reject)=>{
+    const geo=navigator.geolocation;
+    let settled=false, watchId=null, fallback=null;
+    const end=()=>{
+      settled=true;clearTimeout(deadline);clearTimeout(nudge);abortFix=null;
+      if(watchId!=null){geo.clearWatch(watchId);watchId=null}
+    };
+    const ok=(pos,fresh)=>{if(!settled){end();resolve({pos,fresh})}};
+    const fail=err=>{if(!settled){end();reject(err)}};
+    // A browser that leaves timestamp unset gets the benefit of the doubt.
+    const isFresh=p=>!p.timestamp||Date.now()-p.timestamp<=FIX_FRESH_MS;
+    const watch=()=>{
+      if(settled||watchId!=null)return;
+      watchId=geo.watchPosition(
+        q=>{if(isFresh(q))ok(q,true);else fallback=q},
+        // Only a refusal ends it early; anything else may still resolve
+        // before the deadline, so keep listening.
+        e=>{if(e&&e.code===1)fail(e)},
+        {enableHighAccuracy:true,maximumAge:0});
+    };
+    const deadline=setTimeout(()=>fallback?ok(fallback,false):fail({code:3}),FIX_DEADLINE_MS);
+    // A request that has said nothing at all after five seconds is the stuck
+    // case, not a slow one: start the watch alongside it rather than waiting
+    // for an answer that may never come to tell us to.
+    const nudge=setTimeout(watch,5000);
+    abortFix=()=>fail({code:'aborted'});
+    geo.getCurrentPosition(
+      p=>{if(isFresh(p))ok(p,true);else{fallback=p;watch()}},
+      e=>{if(e&&e.code===1)fail(e);else watch()},
+      GEO_OPTS);
+  });
+}
 
 // The single place a position becomes the app's position.
 function applyFix(p){
@@ -1185,12 +1298,18 @@ function applyFix(p){
   updateSunBar(uLat,uLon);
 }
 function requestLocation(){
+  if(!navigator.geolocation){showErr(t('gpsFailed'));return}
   show('scr-load');
-  navigator.geolocation.getCurrentPosition(
-    p=>{applyFix(p);loadDeps()},
-    ()=>{alert(t('locDenied'));useDemo()},
-    GEO_OPTS
-  );
+  acquireFix().then(({pos,fresh})=>{applyFix(pos);locStale=!fresh;loadDeps()})
+    .catch(e=>{
+      // Hidden mid-request: go back to the start and ask again on return.
+      if(e&&e.code==='aborted'){pendingOnReturn=requestLocation;show('scr-perm');return}
+      // Only a refusal means the demo. A timeout or a missing signal used to
+      // land here too, with "location denied" on screen and a board for
+      // Wedding - the wrong place, under the wrong explanation.
+      if(e&&e.code===1){alert(t('locDenied'));useDemo();return}
+      showErr(t('gpsFailed'));
+    });
 }
 function useDemo(){
   // Hugenottenplatz area (Wedding/Mitte, Bus 50 territory)
@@ -1206,50 +1325,168 @@ function useDemo(){
 // the loading screen indefinitely (observed during the 2026-09-01 outages).
 function apiFetch(url){return fetch(url,{signal:AbortSignal.timeout(12000)})}
 
-// ── Load nearby departures ─────────────────────────────
-async function loadDeps(){
+// ── Search radius ─────────────────────────────────────
+// 0-2000 m in 100 m steps, persisted per device. 2000 is also the Worker's own
+// ceiling, so the slider cannot ask for something the API would quietly clamp.
+const RADIUS={min:0,max:2000,step:100,dflt:700};
+let radiusM=(function(){
   try{
+    const s=localStorage.getItem('sunside/radius');
+    // The null check is load-bearing: Number(null) is 0, which is a valid
+    // radius, so without it every first visit would open on an empty board.
+    if(s!==null){
+      const v=Number(s);
+      if(Number.isInteger(v)&&v>=RADIUS.min&&v<=RADIUS.max&&v%RADIUS.step===0)return v;
+    }
+  }catch(e){}
+  return RADIUS.dflt;
+})();
+
+// How many of the stops inside the radius get a departures request: the four
+// nearest, whatever the radius. The radius decides which stops are ELIGIBLE -
+// a small one keeps the board to what is at hand, a large one reaches a stop
+// that 700 m would have missed in the countryside - not how many are asked.
+//
+// Growing this with the radius was built and measured, and it did not pay.
+// At 52.5436/13.3474 (Wedding) the 8 nearest stops all sit within 750 m, and
+// stops 5 to 8 added 0 new line+direction pairs between them: every line they
+// serve also stops nearer, and the one-card-per-line rule keeps the nearer
+// one. Four extra upstream requests per refresh for no new card. Where a wide
+// radius genuinely matters - outside the cities - there are rarely more than
+// four stops inside 2 km to begin with.
+const FAN_OUT=4;
+
+function radiusLabel(){
+  document.getElementById('radius-val').textContent=`${radiusM} m`;
+  const inp=document.getElementById('radius-input');
+  inp.value=String(radiusM);
+  inp.setAttribute('aria-valuetext',t('radiusAria')(radiusM));
+}
+(function(){
+  const inp=document.getElementById('radius-input');
+  let timer=null;
+  // `input` moves the number with the thumb; `change` moves the board, once,
+  // when the rider lets go. Debounced as well, because a keyboard's arrow keys
+  // fire `change` on every single step.
+  inp.addEventListener('input',()=>{radiusM=Number(inp.value);radiusLabel()});
+  inp.addEventListener('change',()=>{
+    radiusM=Number(inp.value);radiusLabel();
+    try{localStorage.setItem('sunside/radius',String(radiusM))}catch(e){}
+    clearTimeout(timer);
+    timer=setTimeout(()=>{if(uLat!=null)loadDeps({quiet:true})},250);
+  });
+})();
+
+// Straight-line distance from the rider's actual fix to a stop, in metres.
+//
+// Not the distance the API reports. The nearby query rounds the position to a
+// ~110 m grid so that riders near each other share one cache entry, and every
+// distance an upstream returns is measured from that grid point - up to ~65 m
+// from where the rider is standing, which is enough to swap two stops on
+// opposite sides of a street and to print the wrong walk on every card. The
+// stops' own coordinates are exact, so measuring here costs nothing and the
+// error disappears. Falls back to the reported figure for a stop with no
+// coordinates, which no current provider sends.
+function losMetres(s){
+  const l=s.location;
+  if(l&&l.latitude!=null&&l.longitude!=null)
+    return Math.round(haversine(uLat,uLon,l.latitude,l.longitude)*1000);
+  return s.distance??null;
+}
+
+// ── Load nearby departures ─────────────────────────────
+// What the board currently shows, so a language switch can re-render the
+// right thing: 'deps' (a board), 'empty' (nothing inside the radius) or
+// 'error' (showErr's message, left alone).
+let boardState=null;
+// Stops behind the label "4 of 9 stops within 700 m". `m` is the radius those
+// counts were taken at, not the slider's current position mid-drag.
+let stopCounts={shown:0,total:0,more:false,m:RADIUS.dflt};
+
+// Every call takes a ticket; only the newest may touch the screen. The radius
+// slider is what made this necessary: two quick moves start two loads, and the
+// first can easily finish last and paint the board for the radius you just left.
+let loadSeq=0;
+
+async function loadDeps(opts={}){
+  const seq=++loadSeq;
+  const current=()=>seq===loadSeq;
+  const list=document.getElementById('dep-list');
+  if(opts.quiet)list.classList.add('busy');
+  try{
+    // Nothing is within 0 m; there is no request worth making for that.
+    if(radiusM===0){renderNoStops();return}
+    const m=radiusM;
     // Round coords to 3 decimals (~110m grid) so nearby users hit identical
     // cache keys at the proxy. This multiplies cache hit rate during clustering.
+    // The precision this costs is paid back by losMetres(), below.
     const qLat=uLat.toFixed(3), qLon=uLon.toFixed(3);
-    const resp=await apiFetch(`${API}/locations/nearby?latitude=${qLat}&longitude=${qLon}&distance=700&results=10`);
+    // results=25 is the Worker's ceiling: the count in the label should be the
+    // true number of stops inside the circle, not wherever the query stopped.
+    const resp=await apiFetch(`${API}/locations/nearby?latitude=${qLat}&longitude=${qLon}&distance=${m}&results=25`);
+    if(!current())return;
     if(!resp.ok){showErr(resp.status>=500?t('srcDown'):t('loadFailed'));return}
     // The Worker names the upstream that answered. Everything downstream of
     // this call follows the ids it returned, so one read here is enough.
     dataSource=resp.headers.get('X-Data-Source')||null;
     renderAttrib();
-    const nr=await resp.json();
-    if(!nr.length){showErr(t('noStopsNearby'));return}
-    lastStopCount=nr.length;setLocLabel();
+    const raw=await resp.json();
+    if(!current())return;
 
-    // Fan out to 4 stops (was 6). At 4 stops that is still plenty of choice
-    // while cutting upstream load by a third per session. results=12 (was 8):
-    // request COUNT is what the egress budget limits, not response size, so a
-    // longer board per request is free - and it is what makes per-line
-    // coverage and the product filter usable at a busy interchange.
+    // Measured from the rider, held to the radius from the rider, nearest first.
+    const nr=raw.map(s=>({...s,_los:losMetres(s)}))
+      .filter(s=>s._los==null||s._los<=m)
+      .sort((a,b)=>(a._los??Infinity)-(b._los??Infinity));
+    if(!nr.length){renderNoStops();return}
+    const fan=nr.slice(0,FAN_OUT);
+    stopCounts={shown:fan.length,total:nr.length,more:raw.length>=25,m};
+
     // Every product is requested regardless of the filter, so all filter
     // combinations share one proxy cache key instead of minting a new upstream
     // request each; the filter then applies client-side, instantly.
-    const proms=nr.slice(0,4).map(s=>
+    // results=12: request COUNT is what the egress budget limits, not response
+    // size, so a longer board per request is free - and it is what makes
+    // per-line coverage and the product filter usable at a busy interchange.
+    const proms=fan.map(s=>
       apiFetch(`${API}/stops/${s.id}/departures?duration=35&results=12&bus=true&suburban=true&subway=true&tram=true&regional=true&ferry=false&express=false`)
         .then(r=>r.json())
-        .then(d=>(d.departures||[]).map(x=>({...x,_sId:s.id,_sName:s.name,_sDist:s.distance??null,
+        .then(d=>(d.departures||[]).map(x=>({...x,_sId:s.id,_sName:s.name,_sDist:s._los,
           _sLat:s.location?.latitude??null,_sLon:s.location?.longitude??null})))
         .catch(()=>[])
     );
     const deps=(await Promise.all(proms)).flat();
+    if(!current())return;
 
     allDeps=pickPerLineDir(deps,20);
+    boardState='deps';
+    setLocLabel();
     renderDeps(allDeps);
     show('scr-deps');
   }catch(e){
+    if(!current())return;
     console.error(e);
     // A timeout means the request stalled, which in practice is the data
     // source hanging - tell the truth rather than blaming the connection.
     showErr(e?.name==='TimeoutError'?t('srcDown'):t('loadFailed'));
+  }finally{
+    if(current())list.classList.remove('busy');
   }
 }
-let lastStopCount=0;
+
+// No stop inside the radius is a state of the board, not an error. The rider
+// is one slider move from an answer, so the slider has to stay on screen - and
+// before the radius was adjustable this went to the error screen, whose only
+// way out was "start over".
+function renderNoStops(){
+  allDeps=[];
+  boardState='empty';
+  stopCounts={shown:0,total:0,more:false,m:radiusM};
+  setLocLabel();
+  document.getElementById('filter-row').innerHTML='';
+  document.getElementById('dep-list').innerHTML=
+    `<div class="state-view"><div class="sv-icon">📍</div><h2>${t('noDeps')}</h2><p>${t('noStopsInRadius')(radiusM)}</p></div>`;
+  show('scr-deps');
+}
 
 function depMs(d){return new Date(d.when||d.plannedWhen).getTime()}
 
@@ -1275,14 +1512,21 @@ function pickPerLineDir(deps,cap){
     const dDist=d._sDist??Infinity, cDist=cur._sDist??Infinity;
     if(dDist<cDist||(dDist===cDist&&depMs(d)<depMs(cur)))best.set(key,d);
   }
-  return [...best.values()].sort((a,b)=>depMs(a)-depMs(b)).slice(0,cap);
+  // Nearest stop first, then soonest within a stop. The board used to run by
+  // departure time alone, which put a bus 600 m away above one at the stop you
+  // are standing at because it left a minute earlier. Unknown distances sort
+  // last; Infinity - Infinity is NaN, which || then hands to the time order.
+  return [...best.values()]
+    .sort((a,b)=>((a._sDist??Infinity)-(b._sDist??Infinity))||(depMs(a)-depMs(b)))
+    .slice(0,cap);
 }
 
 // The label under "Nearby departures". It prints the actual fix - coordinates,
 // accuracy and the time it was taken - so a refresh is visibly a new fix
 // rather than something the user has to take on trust.
 function setLocLabel(){
-  document.getElementById('loc-label').textContent=t('stopsWithin')(lastStopCount);
+  const c=stopCounts;
+  document.getElementById('loc-label').textContent=t('stopsWithin')(c.shown,c.total,c.m,c.more);
   const bits=[];
   if(locSource==='demo'){
     bits.push(t('demoLoc'));
@@ -1421,7 +1665,7 @@ async function selectDep(idx){
   ]);
 
   selTrip=tripData;
-  radarVehicle=veh;
+  radarVehicle=veh;radarAt=veh?Date.now():0;
   candidateDeps=cands;
   renderVehicleStrip(veh);
   renderStops(tripData);
@@ -1476,21 +1720,33 @@ async function fetchCandidateDeps(dep){
 }
 
 // ── Radar: find the actual vehicle on the map ──────────
-async function fetchVehiclePosition(dep){
-  // Build bounding box 1.5km around user
-  const D=0.014; // ~1km in degrees
-  const bbox=`north=${uLat+D}&south=${uLat-D}&west=${uLon-D}&east=${uLon+D}`;
+// Looks for the vehicle within 1.5 km of `center` - the boarding stop by
+// default, the vehicle's last known position while following the ride.
+//
+// The box used to be centred on the RIDER and drawn as ±0.014 degrees both
+// ways, which at Berlin's latitude is 1.56 km north-south but only 0.95 km
+// east-west. Harmless while every stop was within 700 m; with a 2 km radius a
+// stop 1.2 km east put the vehicle approaching it outside the box.
+async function fetchVehiclePosition(dep,center){
+  const c=center||{lat:dep._sLat??uLat,lon:dep._sLon??uLon};
+  const dLat=1500/111320, dLon=1500/(111320*Math.cos(c.lat*Math.PI/180));
+  const f=v=>v.toFixed(4);
+  const bbox=`north=${f(c.lat+dLat)}&south=${f(c.lat-dLat)}&west=${f(c.lon-dLon)}&east=${f(c.lon+dLon)}`;
   try{
     const r=await apiFetch(`${API}/radar?${bbox}&results=64&duration=20&frames=1&polylines=false`);
     const data=await r.json();
     const vehicles=data.movements||[];
 
-    // Match by tripId first, fallback to line name + direction
+    // Match by tripId first. Failing that, the same line and direction - and
+    // of those, the one nearest the centre, not whichever the upstream happened
+    // to list first. The fallback is not rare: ids from the official ReST
+    // provider (v~) never match the radar's (h~), which always comes from mgate.
     let match=vehicles.find(v=>v.tripId===dep.tripId);
     if(!match){
-      match=vehicles.find(v=>
-        v.line?.name===dep.line?.name && v.direction===dep.direction
-      );
+      const away=v=>haversine(c.lat,c.lon,v.location.latitude,v.location.longitude);
+      match=vehicles
+        .filter(v=>v.location&&v.line?.name===dep.line?.name&&v.direction===dep.direction)
+        .sort((a,b)=>away(a)-away(b))[0];
     }
     return match||null;
   }catch{return null}
@@ -1579,12 +1835,19 @@ function renderStops(trip){
   const recentTo=new Set(histTrips
     .filter(h=>h.line===(selDep.line?.name||'?')&&h.dir===(selDep.direction||'?'))
     .map(h=>h.to));
+  // Rows refer to the list by index. They used to embed the WHOLE stops array
+  // as JSON in every onclick attribute, which was both quadratic - a 42-stop
+  // route rendered 42 copies of itself - and an injection path: only `"` was
+  // escaped, and an attribute's character references are decoded before its
+  // script runs, so a stop name containing a literal `&quot;` closed the
+  // string and ran the rest of the name as code.
+  stopRows=stops;
   list.innerHTML=stops.map((s,i)=>{
     // `tm`, not `t` - a local `t` here would shadow the translation function.
     const tm=s.arrival?new Date(s.arrival).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'';
     const disabled=i===0?'disabled':'';
     return `
-    <div class="stop-item anim ${disabled}" style="animation-delay:${i*35}ms" onclick="calcSun(${i},${JSON.stringify(stops).replace(/"/g,'&quot;')})"${disabled?'':' tabindex="0" role="button"'}>
+    <div class="stop-item anim ${disabled}" style="animation-delay:${i*35}ms" onclick="calcSun(${i},stopRows)"${disabled?'':' tabindex="0" role="button"'}>
       <div class="sdot ${i===0?'origin':''}"></div>
       <div class="stop-name">${esc(s.name)}${i===0?` <span style="color:var(--accent);font-size:var(--xs)">${t('boardingHere')}</span>`:i>0&&recentTo.has(s.name)?recentTag():''}</div>
       ${tm?`<div class="stop-time">${tm}</div>`:''}
@@ -1886,7 +2149,7 @@ function clockIdx(arrivals,now){
 function journeyIdx(){
   const rows=legAnalysis.rows;
   if(jReplay!=null)return Math.min(jReplay,rows.length-1);
-  if(radarActive&&radarVehicle?.location){
+  if(radarLive()){
     let best=0,bd=Infinity;
     rows.forEach((s,i)=>{
       if(s.lat==null)return;
@@ -1898,8 +2161,24 @@ function journeyIdx(){
   return clockIdx(rows.map(s=>s.arrival),Date.now());
 }
 
+function startRadarFollow(){
+  stopRadarFollow();
+  if(!radarActive||!radarVehicle)return;
+  radarTimer=setInterval(async()=>{
+    if(document.hidden)return;
+    const last=radarVehicle?.location;
+    const v=await fetchVehiclePosition(selDep,last?{lat:last.latitude,lon:last.longitude}:null);
+    // The screen may have been left while the request was in flight.
+    if(!radarTimer)return;
+    if(v){radarVehicle=v;radarAt=Date.now()}
+    updateJourney();
+  },RADAR_REFRESH_MS);
+}
+function stopRadarFollow(){if(radarTimer){clearInterval(radarTimer);radarTimer=null}}
+
 function openJourney(){
   jPaused=false;jReplay=null;
+  startRadarFollow();
   renderJourney();
   show('scr-journey');
   updateJourney();
@@ -1927,7 +2206,7 @@ function updateJourney(){
   const {rows,legs}=legAnalysis;
   const idx=journeyIdx();
   const arrived=idx>=rows.length-1&&jReplay==null;
-  const live=radarActive&&radarVehicle;
+  const live=radarLive();
   const src=arrived?t('done'):live?`<span class="live-dot"></span>${t('liveGps')}`:t('clockSrc');
   const leg=legs[Math.min(idx,legs.length-1)];
   const seg=arrived?esc(rows[rows.length-1].name):`${esc(leg.from)} → ${esc(leg.to)}`;
@@ -2074,8 +2353,9 @@ function esc(s){
 function show(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  // Leaving the journey screen must clear its ticker (F3).
+  // Leaving the journey screen must clear its ticker (F3), and its radar poll.
   if(id!=='scr-journey'&&jTimer){clearInterval(jTimer);jTimer=null;jReplay=null}
+  if(id!=='scr-journey')stopRadarFollow();
   // Off the result screen the analysed departure no longer applies - the sun
   // bar goes back to the live clock (v2A item 3).
   if(sunBarWhen&&(id==='scr-perm'||id==='scr-deps')){
@@ -2084,6 +2364,7 @@ function show(id){
   }
 }
 function showErr(msg){
+  boardState='error';
   document.getElementById('filter-row').innerHTML='';
   document.getElementById('fix-label').textContent='';
   document.getElementById('dep-list').innerHTML=`<div class="state-view"><div class="sv-icon">⚠️</div><h2>${t('error')}</h2><p>${msg}</p><button class="btn btn-ghost" onclick="show('scr-perm')" style="margin-top:var(--sp4)">${t('startOver')}</button></div>`;
@@ -2095,17 +2376,44 @@ function showErr(msg){
 // nothing on screen revealed that the position had not moved. Demo mode has no
 // fix to re-read, so it only reloads.
 function doRefresh(){
-  if(!uLat)return;
+  if(uLat==null)return;
+  if(locSource!=='gps'||!navigator.geolocation){show('scr-load');updateSunBar(uLat,uLon);loadDeps();return}
+  // A hidden page does not go looking for a position; it does so on return.
+  if(document.hidden){pendingOnReturn=doRefresh;return}
   show('scr-load');
-  if(locSource!=='gps'||!navigator.geolocation){updateSunBar(uLat,uLon);loadDeps();return}
-  navigator.geolocation.getCurrentPosition(
-    p=>{applyFix(p);loadDeps()},
-    // A failed re-read is no reason to lose the board: keep the previous fix,
-    // say so in the label, and reload with it.
-    ()=>{locStale=true;loadDeps()},
-    GEO_OPTS
-  );
+  acquireFix().then(({pos,fresh})=>{applyFix(pos);locStale=!fresh;loadDeps()})
+    .catch(e=>{
+      // Hidden mid-request: put the board back and read again on return.
+      if(e&&e.code==='aborted'){pendingOnReturn=doRefresh;show('scr-deps');return}
+      // A failed re-read is no reason to lose the board: keep the previous
+      // fix, say so in the label, and reload with it.
+      locStale=true;loadDeps();
+    });
 }
+
+// ── Leaving and coming back to the tab ─────────────────
+// Hiding the page releases the location at once; coming back to the board
+// after a minute or more reads it again, because that is the moment a rider
+// expects it to show where they are now. Only the board refreshes itself:
+// on the exit-stop, verdict or journey screens a new position would change
+// nothing but the screen under the rider's thumb.
+let hiddenAt=null, pendingOnReturn=null;
+function onHidden(){
+  hiddenAt=Date.now();
+  if(abortFix)abortFix();
+}
+function onVisible(){
+  // A page restored from the back/forward cache may never have seen itself
+  // hidden; the age of the fix is the next best measure of time away.
+  const away=hiddenAt!=null?Date.now()-hiddenAt:(locAt?Date.now()-locAt.getTime():0);
+  hiddenAt=null;
+  const next=pendingOnReturn;pendingOnReturn=null;
+  if(next){next();return}
+  const onBoard=document.getElementById('scr-deps').classList.contains('active');
+  if(onBoard&&locSource==='gps'&&away>=60000)doRefresh();
+}
+document.addEventListener('visibilitychange',()=>{document.hidden?onHidden():onVisible()});
+window.addEventListener('pageshow',e=>{if(e.persisted)onVisible()});
 
 // v2A a11y: card rows carry role="button" + tabindex, so Enter/Space must
 // activate them like a real button. One delegated listener, not per-card.

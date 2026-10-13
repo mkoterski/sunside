@@ -139,7 +139,7 @@ const MOTIS_BASE = 'https://api.transitous.org';
 // also asks for a visible link to transitous.org/sources, which the SPA
 // renders whenever MOTIS served the data.
 const MOTIS_UA =
-  'sunside-berlin/0.25 (+https://github.com/mkoterski/sunside; matthias.koterski@nextwind.de)';
+  'sunside-berlin/0.26 (+https://github.com/mkoterski/sunside; matthias.koterski@nextwind.de)';
 
 // GTFS route types as MOTIS names them, mapped onto the product vocabulary the
 // SPA already uses for badge colours and the filter chips.
@@ -781,9 +781,21 @@ function parseProducts(sp) {
 }
 
 function num(sp, key, dflt) {
-  const v = Number(sp.get(key));
+  const raw = sp.get(key);
+  // Absent is not zero. Number(null) and Number('') are both 0 - finite, and
+  // so silently accepted as a value: a nearby request without coordinates
+  // asked upstream about Null Island instead of failing with the 400 written
+  // for exactly that, and one without a radius searched 0 m. The SPA always
+  // sends every parameter, which is the only reason it never showed.
+  if (raw === null || raw.trim() === '') return dflt;
+  const v = Number(raw);
   return Number.isFinite(v) ? v : dflt;
 }
+
+// A count or a distance for an upstream: whole, and inside the range that
+// upstream can mean anything by. A negative `results` reached MOTIS as
+// slice(0, -3), which silently drops the last three stops rather than failing.
+const clampInt = (v, lo, hi) => Math.min(hi, Math.max(lo, Math.round(v)));
 
 // Split a namespaced id back into its provider and that provider's own id. An
 // id with no prefix is treated as mgate HAFAS, which keeps anything bookmarked
@@ -881,8 +893,8 @@ async function handleApi(url, env) {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
       return jsonResp({ error: 'latitude and longitude are required' }, 400);
     }
-    const distance = Math.min(num(sp, 'distance', 700), 2000);
-    const results = Math.min(num(sp, 'results', 10), 25);
+    const distance = clampInt(num(sp, 'distance', 700), 0, 2000);
+    const results = clampInt(num(sp, 'results', 10), 1, 25);
     const args = { lat, lon, distance, results, cfg };
     // Inside Berlin/Brandenburg both VBB sources are asked before MOTIS;
     // outside, neither knows anything and MOTIS is the only source. Order
@@ -915,8 +927,8 @@ async function handleApi(url, env) {
   const depMatch = path.match(/^stops\/(.+)\/departures$/);
   if (depMatch) {
     const { provider, id } = splitId(depMatch[1]);
-    const duration = Math.min(num(sp, 'duration', 35), 180);
-    const results = Math.min(num(sp, 'results', 12), 60);
+    const duration = clampInt(num(sp, 'duration', 35), 1, 180);
+    const results = clampInt(num(sp, 'results', 12), 1, 60);
     const args = { id, duration, results, products: products.mask, productSet: products.set, cfg };
     // Both VBB providers name a stop by its station number, so a board asked
     // of one can be answered by the other with the id exactly as it came in.
@@ -963,7 +975,7 @@ async function handleApi(url, env) {
     if (!inVbbArea((north + south) / 2, (east + west) / 2)) {
       return jsonResp({ movements: [] }, 200, { 'X-Data-Source': 'motis' });
     }
-    const results = Math.min(num(sp, 'results', 64), 128);
+    const results = clampInt(num(sp, 'results', 64), 1, 128);
     const args = { north, south, east, west, results, products: products.mask };
     const key = `radar|${north.toFixed(3)}|${south.toFixed(3)}|${east.toFixed(3)}|${west.toFixed(3)}|${results}`;
     try {
@@ -1000,7 +1012,7 @@ export default {
       const cfg = vbbConfig(env);
       return withCors(jsonResp({
         ok: true,
-        version: '0.25',
+        version: '0.26',
         // The base is operational information worth seeing (test system or
         // production?); the access id is never reported, here or anywhere.
         upstreams: {

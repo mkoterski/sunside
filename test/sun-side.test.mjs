@@ -157,7 +157,10 @@ function pickPerLineDir(deps, cap) {
     const dDist = d._sDist ?? Infinity, cDist = cur._sDist ?? Infinity;
     if (dDist < cDist || (dDist === cDist && depMs(d) < depMs(cur))) best.set(key, d);
   }
-  return [...best.values()].sort((a, b) => depMs(a) - depMs(b)).slice(0, cap);
+  // v0.26: nearest stop first, then soonest within a stop.
+  return [...best.values()]
+    .sort((a, b) => ((a._sDist ?? Infinity) - (b._sDist ?? Infinity)) || (depMs(a) - depMs(b)))
+    .slice(0, cap);
 }
 const dep = (name, dir, when, dist) =>
   ({ line: { name }, direction: dir, when, _sDist: dist });
@@ -178,13 +181,75 @@ eq(picked.find(d => d.line.name === "M13")._sDist, 112,
   "the surviving M13 is the one at the nearest stop, not the soonest");
 eq(picked[picked.length - 1].line.name, "250",
   "a line that used to fall off the cap now has a card");
-eq(picked.map(d => depMs(d)).every((ms, i, a) => i === 0 || a[i - 1] <= ms), true,
-  "cards stay ordered by departure time");
+// v0.26: ordered by the stop's distance, nearest on top, and by time within a
+// stop - not by time alone, which put a bus 600 m away above the one at the
+// stop the rider is standing at because it left a minute earlier.
+eq(picked.map(d => d._sDist).every((m, i, a) => i === 0 || a[i - 1] <= m), true,
+  "cards are ordered by stop distance, nearest first");
+eq(picked[0]._sDist, 112, "the nearest stop is on top");
+const SAME_STOP = pickPerLineDir([
+  dep("M1", "Rosenthal", "2026-09-21T14:58:00+02:00", 112),
+  dep("M13", "Virchow-Klinikum", "2026-09-21T14:49:00+02:00", 112),
+  dep("50", "Prenzlauer Berg", "2026-09-21T14:44:00+02:00", 480),
+], 20);
+eq(SAME_STOP.map(d => d.line.name).join(","), "M13,M1,50",
+  "within one stop the sooner departure leads; a farther stop follows even if it leaves first");
 eq(pickPerLineDir(BOARD, 2).length, 2, "cap is honoured");
 // Stops missing a distance must not win over stops that have one.
 eq(pickPerLineDir([dep("U2", "Pankow", "2026-09-21T14:49:00+02:00", undefined),
                    dep("U2", "Pankow", "2026-09-21T14:50:00+02:00", 538)], 20)[0]._sDist, 538,
   "an unknown stop distance loses to a known one");
+eq(pickPerLineDir([dep("A", "x", "2026-09-21T14:40:00+02:00", undefined),
+                   dep("B", "y", "2026-09-21T14:50:00+02:00", 900)], 20)[0].line.name, "B",
+  "a card with no distance sorts after every card that has one");
+
+// -- v0.26: the search radius -------------------------------------------------
+// Mirrors of the rules in public/index.html.
+const RADIUS = { min: 0, max: 2000, step: 100, dflt: 700 };
+function parseRadius(stored) {
+  if (stored !== null) {
+    const v = Number(stored);
+    if (Number.isInteger(v) && v >= RADIUS.min && v <= RADIUS.max && v % RADIUS.step === 0) return v;
+  }
+  return RADIUS.dflt;
+}
+eq(parseRadius(null), 700, "a first visit (nothing stored) gets the default, not Number(null) = 0");
+eq(parseRadius("0"), 0, "a stored 0 is a real choice and is kept");
+eq(parseRadius("1300"), 1300, "a stored radius round-trips");
+eq(parseRadius("1350"), 700, "off the 100 m grid is not a value the slider can produce");
+eq(parseRadius("2500"), 700, "past the Worker's 2000 m ceiling is rejected, not clamped");
+eq(parseRadius("abc"), 700, "garbage falls back to the default");
+
+// The label under "Nearby departures": what was searched, honestly counted.
+// Mirror of the German string in public/index.html.
+const stopsWithin = (shown, total, m, more) => shown === total
+  ? `${shown} ${shown === 1 ? "Haltestelle" : "Haltestellen"} im Umkreis von ${m} m`
+  : `Die ${shown} nächsten von ${total}${more ? "+" : ""} Haltestellen im Umkreis von ${m} m`;
+eq(stopsWithin(4, 6, 700, false), "Die 4 nächsten von 6 Haltestellen im Umkreis von 700 m",
+  "more stops in the circle than boards fetched: the label says which ones are shown");
+eq(stopsWithin(2, 2, 500, false), "2 Haltestellen im Umkreis von 500 m", "all of them shown: just the count");
+eq(stopsWithin(1, 1, 300, false), "1 Haltestelle im Umkreis von 300 m", "one stop is singular");
+eq(stopsWithin(4, 25, 2000, true), "Die 4 nächsten von 25+ Haltestellen im Umkreis von 2000 m",
+  "a capped query is marked as 'at least'")
+
+// Line of sight from the rider, in metres - not from the ~110 m cache grid.
+// Mirror of the app's haversine, which returns kilometres.
+function haversine(la1, lo1, la2, lo2) {
+  const R = 6371, r = Math.PI / 180;
+  const dLa = (la2 - la1) * r, dLo = (lo2 - lo1) * r;
+  const a = Math.sin(dLa / 2) ** 2 + Math.cos(la1 * r) * Math.cos(la2 * r) * Math.sin(dLo / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+const losM = (la1, lo1, la2, lo2) => Math.round(haversine(la1, lo1, la2, lo2) * 1000);
+eq(losM(52.5200, 13.4050, 52.5200, 13.4050), 0, "standing on the stop is 0 m");
+const north100 = losM(52.5200, 13.4050, 52.5209, 13.4050);
+eq(north100 >= 99 && north100 <= 101, true, "0.0009 deg of latitude is about 100 m");
+// The grid error itself: the same stop, measured from the rider and from the
+// rounded query point (52.520 / 13.405 for a rider at 52.5204 / 13.4054).
+const fromRider = losM(52.5204, 13.4054, 52.5212, 13.4054);
+const fromGrid = losM(52.520, 13.405, 52.5212, 13.4054);
+eq(fromGrid - fromRider > 40, true,
+  "measured from the cache grid the same stop reads tens of metres off - which is why the app measures itself");
 
 // ── Auto theme: sun elevation -> interface mode (v0.22) ──────────────────────
 // Mirror of the rule in public/index.html. The clock is deliberately not an

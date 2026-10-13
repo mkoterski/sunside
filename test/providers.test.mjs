@@ -214,6 +214,29 @@ eq(splitId("900110007").provider, "hafas", "an unprefixed id bookmarked before v
 eq(splitId(encodeURIComponent("v~1|129084|0|86|22092026")).id, "1|129084|0|86|22092026",
   "a journey reference survives the round trip through the URL");
 
+// ── Worker query parameters ──────────────────────────────────────────────────
+// Mirror of num() and clampInt() in worker/src/index.js. The bug this pins:
+// Number(null) is 0, which is finite, so an ABSENT parameter came back as 0
+// rather than as its default.
+function num(sp, key, dflt) {
+  const raw = sp.get(key);
+  if (raw === null || raw.trim() === "") return dflt;
+  const v = Number(raw);
+  return Number.isFinite(v) ? v : dflt;
+}
+const clampInt = (v, lo, hi) => Math.min(hi, Math.max(lo, Math.round(v)));
+const qs = (q) => new URLSearchParams(q);
+
+eq(num(qs(""), "distance", 700), 700, "a missing radius is the default, not 0 m");
+eq(Number.isNaN(num(qs("longitude=13.4"), "latitude", NaN)), true,
+  "a missing latitude stays NaN, so the 400 for it can fire - not Null Island");
+eq(num(qs("distance="), "distance", 700), 700, "an empty value counts as missing");
+eq(num(qs("distance=0"), "distance", 700), 0, "but an explicit 0 is a real 0");
+eq(num(qs("distance=abc"), "distance", 700), 700, "garbage is the default");
+eq(clampInt(-3, 1, 25), 1, "a negative count cannot reach MOTIS as slice(0, -3)");
+eq(clampInt(2.6, 1, 25), 3, "counts are whole");
+eq(clampInt(5000, 0, 2000), 2000, "the radius ceiling holds");
+
 // ── boardingIndex: where the rider gets on ───────────────────────────────────
 // Mirror of the client rule. Four strategies, each covering a case the one
 // before it gets wrong.

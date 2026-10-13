@@ -1,4 +1,4 @@
-# SunSide Berlin - v0.25
+# SunSide Berlin - v0.26
 
 **Status:** DEVELOPMENT
 **Versioning:** `v0.x` = development/testing, `v1.x` = production-ready
@@ -146,15 +146,16 @@ Worker - but two things still work:
 
 | | |
 |---|---|
-| Nearby departures | Geolocation (rounded to ~110 m so nearby users share cache keys) fans out to the 4 closest stops, merged into one live board with delays. One card per line and direction, so overlapping stops cannot crowd a line off the list; each card shows the walk to its boarding stop |
+| Nearby departures | The 4 nearest stops inside the search radius, merged into one live board with delays and ordered by the stop's straight-line distance from you, nearest on top, soonest first within a stop. One card per line and direction, so overlapping stops cannot crowd a line off the list. The query position is rounded to ~110 m so nearby riders share cache entries; every distance on screen is measured from your actual fix instead, because measured from that grid it was up to ~50 m off and put stops in the wrong order |
+| Search radius | A slider on the board, 0-2000 m in 100 m steps, remembered per device. It decides which stops are eligible, not how many are asked: growing the fan-out with the radius was built, measured in Wedding - stops 5 to 8 added no new line - and dropped. Nothing inside the radius is an answer on the board with the slider still in reach, not an error screen |
 | Transport filter | Chips above the board for S-Bahn / U-Bahn / Tram / Bus / Regional, multi-select, persisted. The row wraps rather than scrolling sideways, so no option sits off the edge of a phone unannounced. Counts come from the unfiltered board, so a chip says what picking it gives you. Filtering is client-side, so every combination shares one proxy cache key |
-| Refresh | Re-reads the GPS fix, not just the board. The location label prints the coordinates, accuracy and time of the fix, so a refresh is visibly a new one |
+| Refresh | Re-reads the GPS fix, not just the board. The location label prints the coordinates, accuracy and time of the fix, so a refresh is visibly a new one. A cached fix older than 30 s is not accepted as current - the device is asked to look again - and no request can leave the screen on "loading": after 20 s it ends with the last fix, labelled stale. A hidden tab lets go of the location at once, and coming back to the board after a minute away re-reads it without a tap |
 | Demo mode | A fixed Hugenottenplatz location for trying the flow without granting geolocation |
 | Exit picker | The trip's real stopover list, boarding stop marked, each later stop tappable. Every stop, not the first eight: the list flows with the page rather than sitting in a 340px box whose scrollbar a phone never draws |
 | Sun-side verdict | Sit left / sit right / neutral, with the sun's azimuth and elevation, computed per segment and distance-weighted |
 | Route spine | Travel-order stop list on the result screen; the rail between stops is tinted by which side the sun strikes on that segment, with board/exit/flips flags and per-segment bearing + km |
 | Shade meter | Distance-weighted km bar in the verdict card: shade-left / even / shade-right, each share paired with its number |
-| Follow the ride | Journey view reached from the verdict: pinned status card (current segment, shade side, clock-estimate vs live-GPS source), the spine with current/passed states, a vertical progress bar, auto-follow with pause, and a replay once arrived. Clock/radar-driven, not a demo timer. Its list stays a scroll container, since auto-follow drives it by `scrollTop`, so it says so: the bottom edge fades while there is more below and clears at the end |
+| Follow the ride | Journey view reached from the verdict: pinned status card (current segment, shade side, clock-estimate vs live-GPS source), the spine with current/passed states, a vertical progress bar, auto-follow with pause, and a replay once arrived. Clock/radar-driven, not a demo timer: the vehicle is re-read every 30 s while this screen is up, and a radar fix older than 75 s stops counting as live, so the clock estimate takes over and the card says so. Its list stays a scroll container, since auto-follow drives it by `scrollTop`, so it says so: the bottom edge fades while there is more below and clears at the end |
 | Flip warning | When the shaded side genuinely changes mid-trip, the verdict says so instead of averaging it away |
 | Exit screen density | The journey summary and the vehicle position are one card, not two boxes with two borders and a gap. Measured at 430x932: 393px of chrome above the first stop became 286px, and stops readable without touching anything went from 7 to 13 |
 | Live radar | The actual vehicle's GPS position via VBB radar (Berlin + Brandenburg only). Position, not heading: HAFAS's radar call will not return a passlist, so the bearing comes from stop geometry - which is the better source on anything but a dead-straight single leg |
@@ -182,6 +183,46 @@ History before v0.10 predates the numbering and is archived by date.
 ### Changelog
 
 ```
+v0.26  2026-10-13  Added: a search radius, 0-2000 m in 100 m steps, on the
+                   board and remembered; and the board ordered by the stop's
+                   straight-line distance from the rider, nearest on top.
+                   The radius decides which stops are eligible, not how many
+                   are asked - a fan-out that grew with it was built,
+                   measured (stops 5 to 8 in Wedding added 0 new lines for 4
+                   extra requests) and dropped.
+                   Fixed: with SunSide open in a second Chrome tab, Refresh
+                   stopped producing a new position. Not reproducible here,
+                   so both mechanisms that produce that symptom are closed:
+                   a fix answered from a cache minutes old was accepted as
+                   current (now checked by its own timestamp, and the device
+                   is made to look again), and a request that never settled
+                   left the app on "loading" for good, because the browser's
+                   timeout does not run while a request waits its turn (now
+                   our own 20 s deadline). A hidden tab now releases the
+                   location immediately, and the board re-reads it on return.
+                   Fixed: every distance came from the ~110 m cache grid, not
+                   the rider - up to ~50 m off, and enough to put Luxemburger
+                   Str. ahead of Samoastr. when it is farther. Measured from
+                   the actual fix now.
+                   Fixed: follow-the-ride's "live GPS" was the vehicle's
+                   position from before boarding, frozen. It was read once,
+                   at selection, and never again, so the current stop never
+                   advanced. Re-read every 30 s now; stale fixes expire.
+                   Fixed: a stop name could run as JavaScript. Each exit-stop
+                   row embedded the whole route as JSON in its onclick,
+                   escaping only `"`; attributes decode `&quot;` before the
+                   script runs. Proven with a crafted name, then removed -
+                   rows now pass an index, and were quadratic in size too.
+                   Fixed: the Worker read an absent parameter as 0, because
+                   Number(null) is 0. A request without coordinates asked
+                   about Null Island instead of returning its 400.
+                   Fixed: a GPS timeout on the first fix showed "location
+                   denied" and a board for Wedding. Only a refusal means the
+                   demo now. Also: the radar box was centred on the rider and
+                   0.95 km wide at Berlin's latitude, which a 2 km radius
+                   outgrew; the stop count claimed more stops than the board
+                   showed; and the fix line sat at 1.9:1 contrast.
+
 v0.25  2026-09-24  Sun mode's borders go from 2px to 1px, on one token
                    (--bw) rather than six rules. At near-black ink an edge is
                    found by its contrast, not its mass, and the second pixel
@@ -496,7 +537,7 @@ by VBB, BVG, S-Bahn Berlin or Deutsche Bahn.
 
 ## Status
 
-Prototype, `v0.25`, DEVELOPMENT, deployed at the URL above. The full loop works
+Prototype, `v0.26`, DEVELOPMENT, deployed at the URL above. The full loop works
 end to end against live data: departures → exit stop → verdict with route spine
 and shade meter → follow-the-ride, with live radar, the best-departure finder,
 the transport filter and opt-in encrypted history, in German and English.
